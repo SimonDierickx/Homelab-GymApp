@@ -1,0 +1,10 @@
+// Copy this file to config.js and fill in real values
+// config.js is gitignored — never commit it
+
+const USERS = {
+  simon: 'your-password-here',
+  sylvia: 'your-password-here'
+};
+
+const API_KEY  = 'your-api-key-here';
+const GYM_API  = 'https://sdckx.be/gym';  // nginx proxy to Claude VM
