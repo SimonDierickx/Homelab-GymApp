@@ -1,0 +1,468 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="Gym"/>
+<meta name="theme-color" content="#0A0A0A"/>
+<title>Gym — sdckx</title>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="icon-192.png"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:#0A0A0A;color:#fff;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display',sans-serif;height:100%;overscroll-behavior:none;}
+body{display:flex;flex-direction:column;max-width:430px;margin:0 auto;min-height:100dvh;}
+#main{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+#timer-bar{position:sticky;bottom:0;z-index:10;display:none;}
+input,textarea,button{font-family:inherit;-webkit-appearance:none;appearance:none;}
+input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
+input[type=number]{-moz-appearance:textfield;}
+::-webkit-scrollbar{display:none;}
+.page{animation:up 0.15s ease;}
+@keyframes up{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+</style>
+</head>
+<body>
+<div id="main"></div>
+<div id="timer-bar"></div>
+<script src="config.js"></script>
+<script>
+const BG='#0A0A0A',CARD='#1C1C1E',CARD2='#2C2C2E',BORDER='rgba(255,255,255,0.09)',T2='rgba(255,255,255,0.45)';
+const COLORS={A:'#5E5CE6',B:'#FF6B35',C:'#30B37D',D:'#FF9F0A',E:'#FF2D55',F:'#32ADE6'};
+
+const BASE_SESSIONS={
+A:{name:'Pull — Posterior',exercises:[
+  {id:'a1',name:'Box Jump',target:'4×4',note:'Full reset each rep'},
+  {id:'a2',name:'Trap Bar Deadlift',target:'4×4',note:'RPE 8, 1-2 RIR'},
+  {id:'a3',name:'Weighted Pull-Up',target:'4×4',note:'Neutral grip if shoulder'},
+  {id:'a4',name:'Nordic Curl',target:'3×6',note:'Controlled eccentric'},
+  {id:'a5',name:'Single-Leg RDL',target:'3×8',note:''},
+  {id:'a6',name:'Chest-Supported Row',target:'3×12',note:''},
+  {id:'a7',name:'Face Pull',target:'3×15',note:'Prehab'},
+  {id:'a8',name:'Neck Isometric',target:'3×10',note:'4 directions'},
+]},
+B:{name:'Push — Upper',exercises:[
+  {id:'b1',name:'Explosive Push-Up',target:'4×5',note:''},
+  {id:'b2',name:'Incline DB Press',target:'4×6',note:'Landmine if shoulder hurts'},
+  {id:'b3',name:'Dip',target:'3×8',note:''},
+  {id:'b4',name:'Lateral Raise',target:'3×15',note:''},
+  {id:'b5',name:'Overhead Tricep Ext.',target:'3×12',note:''},
+  {id:'b6',name:'Face Pull',target:'3×15',note:'Prehab'},
+  {id:'b7',name:'Incline Curl',target:'3×12',note:''},
+  {id:'b8',name:'Dead Bug',target:'3×8',note:''},
+]},
+C:{name:'Lower — Unilateral',exercises:[
+  {id:'c1',name:'Broad Jump',target:'4×3',note:''},
+  {id:'c2',name:'Bulgarian Split Squat',target:'4×7',note:'Manage knee depth'},
+  {id:'c3',name:'Step-Up',target:'3×8',note:''},
+  {id:'c4',name:'Cable Pull-Through',target:'3×12',note:''},
+  {id:'c5',name:'Single-Leg Hip Thrust',target:'3×10',note:''},
+  {id:'c6',name:'Tibialis Raise',target:'3×15',note:'Prehab'},
+  {id:'c7',name:'Single-Leg Calf Raise',target:'3×12',note:''},
+  {id:'c8',name:'Copenhagen Plank',target:'3×25',note:'seconds'},
+]},
+D:{name:'GPP — Support',exercises:[
+  {id:'d1',name:'Pogo Jump',target:'3×20',note:''},
+  {id:'d2',name:'Med Ball Slam',target:'4×5',note:''},
+  {id:'d3',name:'Farmer Carry',target:'3×30',note:'metres'},
+  {id:'d4',name:'Band Pull-Apart',target:'3×20',note:'Prehab'},
+  {id:'d5',name:'Pallof Press',target:'3×10',note:''},
+  {id:'d6',name:'Dead Bug',target:'3×8',note:''},
+  {id:'d7',name:'Copenhagen Plank',target:'3×20',note:'seconds'},
+  {id:'d8',name:'Face Pull',target:'3×15',note:''},
+]},
+E:{name:'Power — Explosive',exercises:[
+  {id:'e1',name:'Box Jump',target:'5×3',note:'Max effort'},
+  {id:'e2',name:'Depth Drop → Broad Jump',target:'4×3',note:''},
+  {id:'e3',name:'Med Ball Rotational Throw',target:'4×5',note:''},
+  {id:'e4',name:'Explosive Push-Up',target:'4×5',note:''},
+  {id:'e5',name:'KB Swing',target:'4×10',note:''},
+  {id:'e6',name:'Lateral Bound',target:'3×5',note:''},
+]},
+F:{name:'Hip Prehab',exercises:[
+  {id:'f1',name:'Hip 90/90 Mobility',target:'3×10',note:''},
+  {id:'f2',name:'Single-Leg Hip Thrust',target:'3×12',note:''},
+  {id:'f3',name:'Cable Hip Flexion',target:'3×12',note:''},
+  {id:'f4',name:'Lateral Band Walk',target:'3×15',note:''},
+  {id:'f5',name:'Copenhagen Plank',target:'3×30',note:'seconds'},
+  {id:'f6',name:"World's Greatest Stretch",target:'2×5',note:''},
+  {id:'f7',name:'Glute Bridge',target:'3×15',note:''},
+]}};
+
+let S={
+  screen:'login',user:null,loginU:'',loginP:'',loginErr:false,
+  sessionKey:null,exercises:[],setData:{},prevWorkout:null,
+  history:[],startTime:null,editMode:false,
+  timerSec:90,timerRemain:90,timerRunning:false,timerInterval:null,
+  noteOpen:{},swipeActive:null,
+  addExName:'',addExTarget:'3×10',addExNote:'',showAddEx:false,
+  customSessions:{}
+};
+
+function parsePres(t){const m=t.match(/(\d+)[×x](\d+)/);return m?{sets:+m[1],reps:+m[2]}:{sets:3,reps:8};}
+function col(){return COLORS[S.sessionKey]||'#5E5CE6';}
+function sess(){return{...BASE_SESSIONS,...S.customSessions};}
+function fmt(n){const m=Math.floor(n/60),s=n%60;return m+':'+(s<10?'0'+s:s);}
+function totalSets(){return Object.values(S.setData).flat().length;}
+function doneSets(){return Object.values(S.setData).flat().filter(x=>x.done).length;}
+
+// Storage helpers
+function storageKey(user){return`gym_history_${user}`;}
+async function loadHistory(){
+  try{
+    const k=storageKey(S.user);
+    const r=await window.storage.get(k);
+    S.history=r?JSON.parse(r.value):[];
+  }catch{S.history=[];}
+}
+async function saveHistory(entry){
+  await loadHistory();
+  S.history.unshift(entry);
+  if(S.history.length>100)S.history=S.history.slice(0,100);
+  await window.storage.set(storageKey(S.user),JSON.stringify(S.history));
+}
+
+// API call to VM backend
+async function postWorkout(entry){
+  try{
+    const r=await fetch(GYM_API+'/save',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-API-Key':API_KEY},
+      body:JSON.stringify(entry)
+    });
+    if(!r.ok)console.error('API save failed:',r.status);
+  }catch(e){console.error('API error:',e);}
+}
+async function fetchHistory(){
+  try{
+    const r=await fetch(GYM_API+'/history?user='+S.user,{headers:{'X-API-Key':API_KEY}});
+    if(r.ok){const d=await r.json();S.history=d;}
+  }catch{await loadHistory();}
+}
+
+function initSetData(exercises,prev){
+  const d={};
+  exercises.forEach(ex=>{
+    const {sets,reps}=parsePres(ex.target);
+    const prevEx=prev?.setData?.[ex.id]||[];
+    d[ex.id]=Array.from({length:sets},(_,i)=>({
+      weight:prevEx[i]?.weight??null,reps:prevEx[i]?.reps??reps,
+      note:'',done:false,prevWeight:prevEx[i]?.weight??null,prevReps:prevEx[i]?.reps??null
+    }));
+  });
+  return d;
+}
+
+function startSession(key){
+  const s=sess()[key];if(!s)return;
+  const prev=S.history.find(h=>h.sessionKey===key)||null;
+  S.sessionKey=key;S.exercises=[...s.exercises];
+  S.prevWorkout=prev;S.setData=initSetData(S.exercises,prev);
+  S.startTime=Date.now();S.editMode=false;S.addExName='';S.showAddEx=false;
+  S.screen='workout';render();
+}
+
+function toggleDone(exId,si){S.setData[exId][si].done=!S.setData[exId][si].done;render();}
+function updateW(exId,si,v){S.setData[exId][si].weight=v===''?null:parseFloat(v)||null;}
+function updateR(exId,si,v){S.setData[exId][si].reps=parseInt(v)||0;}
+function updateNote(exId,si,v){S.setData[exId][si].note=v;}
+function addSet(exId){
+  const prev=S.setData[exId].slice(-1)[0]||{weight:null,reps:parsePres(S.exercises.find(e=>e.id===exId).target).reps};
+  S.setData[exId].push({weight:prev.weight,reps:prev.reps,note:'',done:false,prevWeight:null,prevReps:null});
+  render();
+}
+function removeSet(exId,si){S.setData[exId].splice(si,1);render();}
+function toggleNote(key){S.noteOpen[key]=!S.noteOpen[key];render();}
+function removeExercise(id){if(!confirm('Remove exercise?'))return;S.exercises=S.exercises.filter(e=>e.id!==id);delete S.setData[id];render();}
+function addExercise(){
+  if(!S.addExName.trim())return;
+  const id='cx'+Date.now();
+  const ex={id,name:S.addExName,target:S.addExTarget,note:S.addExNote};
+  S.exercises.push(ex);
+  const{sets,reps}=parsePres(S.addExTarget);
+  S.setData[id]=Array.from({length:sets},()=>({weight:null,reps,note:'',done:false,prevWeight:null,prevReps:null}));
+  S.addExName='';S.addExTarget='3×10';S.addExNote='';S.showAddEx=false;render();
+}
+
+async function finishSession(){
+  const dur=Math.round((Date.now()-S.startTime)/60000);
+  const now=new Date();
+  const entry={
+    id:Date.now(),
+    user:S.user,
+    date:now.toISOString().split('T')[0],
+    datetime:now.toISOString(),
+    time:now.toLocaleTimeString('nl-BE',{hour:'2-digit',minute:'2-digit'}),
+    sessionKey:S.sessionKey,
+    sessionName:sess()[S.sessionKey]?.name,
+    duration:dur,
+    setData:JSON.parse(JSON.stringify(S.setData)),
+    exercises:S.exercises.map(e=>({id:e.id,name:e.name,target:e.target}))
+  };
+  await saveHistory(entry);
+  await postWorkout(entry);
+  if(S.timerInterval){clearInterval(S.timerInterval);S.timerInterval=null;}
+  S.timerRunning=false;
+  document.getElementById('timer-bar').style.display='none';
+  S.screen='complete';render();
+}
+
+// Timer
+function timerStart(){
+  if(S.timerRunning)return;
+  if('Notification' in window&&Notification.permission==='default')Notification.requestPermission();
+  S.timerRunning=true;
+  S.timerInterval=setInterval(()=>{
+    S.timerRemain--;
+    if(S.timerRemain<=0){
+      S.timerRemain=0;S.timerRunning=false;clearInterval(S.timerInterval);S.timerInterval=null;
+      if('Notification' in window&&Notification.permission==='granted')
+        new Notification('Rest done! 💪',{body:'Time for your next set.',icon:'icon-192.png'});
+      if(navigator.vibrate)navigator.vibrate([300,100,300]);
+    }
+    renderTimer();
+  },1000);
+}
+function timerPause(){S.timerRunning=false;clearInterval(S.timerInterval);S.timerInterval=null;renderTimer();}
+function timerReset(sec){
+  S.timerRunning=false;clearInterval(S.timerInterval);S.timerInterval=null;
+  if(sec)S.timerSec=sec;
+  S.timerRemain=S.timerSec;renderTimer();
+}
+
+function renderTimer(){
+  const bar=document.getElementById('timer-bar');if(!bar)return;
+  bar.style.display='block';
+  const pct=S.timerSec>0?(S.timerRemain/S.timerSec)*100:0;
+  const c=S.timerRemain<=10?'#FF3B30':S.timerRemain<=30?'#FF9F0A':col();
+  bar.innerHTML=`<div style="background:${CARD};border-top:0.5px solid ${BORDER};padding:10px 16px 14px">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
+      <span style="font-size:13px;color:${T2}">Rest timer</span>
+      <div style="flex:1;height:3px;background:rgba(255,255,255,0.1);border-radius:2px;overflow:hidden">
+        <div style="width:${pct}%;height:100%;background:${c};transition:width 0.9s linear;border-radius:2px"></div>
+      </div>
+      <span style="font-size:20px;font-weight:600;min-width:44px;text-align:right;color:${c}">${fmt(S.timerRemain)}</span>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      ${[60,90,120,180].map(s=>`<button onclick="timerReset(${s})" style="flex:1;padding:7px 0;border-radius:8px;border:none;background:${S.timerSec===s?c+'30':'rgba(255,255,255,0.07)'};color:${S.timerSec===s?c:'rgba(255,255,255,0.55)'};font-size:12px;font-weight:500;cursor:pointer">${s<60?s+'s':Math.floor(s/60)+'m'}</button>`).join('')}
+      <button onclick="${S.timerRunning?'timerPause()':'timerStart()'}" style="flex:1;padding:7px 0;border-radius:8px;border:none;background:${c};color:white;font-size:13px;font-weight:600;cursor:pointer">${S.timerRunning?'Pause':'Start'}</button>
+      <button onclick="timerReset()" style="width:34px;height:34px;flex-shrink:0;border-radius:8px;border:none;background:rgba(255,255,255,0.07);color:rgba(255,255,255,0.5);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center"><i class="ti ti-refresh"></i></button>
+    </div>
+  </div>`;
+}
+
+function render(){
+  const main=document.getElementById('main');
+  main.innerHTML=renderScreen();
+  main.className='page';
+  // Wire up live inputs
+  main.querySelectorAll('input[data-w]').forEach(i=>{const[e,s]=i.dataset.w.split(',');i.oninput=()=>updateW(e,+s,i.value);});
+  main.querySelectorAll('input[data-r]').forEach(i=>{const[e,s]=i.dataset.r.split(',');i.oninput=()=>updateR(e,+s,i.value);});
+  main.querySelectorAll('textarea[data-n]').forEach(t=>{const[e,s]=t.dataset.n.split(',');t.oninput=()=>updateNote(e,+s,t.value);});
+  const bar=document.getElementById('timer-bar');
+  if(S.screen==='workout'){renderTimer();}
+  else{bar.style.display='none';if(S.timerInterval){clearInterval(S.timerInterval);S.timerInterval=null;S.timerRunning=false;}}
+}
+
+function renderScreen(){
+  if(S.screen==='login')return renderLogin();
+  if(S.screen==='home')return renderHome();
+  if(S.screen==='workout')return renderWorkout();
+  if(S.screen==='complete')return renderComplete();
+  if(S.screen==='history')return renderHistory();
+  return '';
+}
+
+function renderLogin(){return`
+  <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px 28px 40px;min-height:100dvh;">
+    <div style="width:80px;height:80px;border-radius:22px;background:#5E5CE6;display:flex;align-items:center;justify-content:center;margin-bottom:20px;box-shadow:0 8px 32px rgba(94,92,230,0.4)">
+      <i class="ti ti-barbell" style="font-size:40px;color:white"></i>
+    </div>
+    <h1 style="font-size:28px;font-weight:700;margin-bottom:6px">Gym</h1>
+    <p style="color:${T2};font-size:14px;margin-bottom:48px">sdckx.be</p>
+    ${S.loginErr?`<div style="background:rgba(255,59,48,0.15);border:0.5px solid rgba(255,59,48,0.3);border-radius:12px;padding:12px 16px;color:#FF3B30;font-size:13px;width:100%;margin-bottom:16px;text-align:center">Wrong username or password</div>`:''}
+    <input id="lu" type="text" placeholder="Username" autocomplete="username" value="${S.loginU}" oninput="S.loginU=this.value" onkeydown="if(event.key==='Enter')document.getElementById('lp').focus()" style="width:100%;background:${CARD};border:0.5px solid ${BORDER};border-radius:14px;padding:15px 16px;font-size:16px;color:white;margin-bottom:10px;outline:none;"/>
+    <input id="lp" type="password" placeholder="Password" autocomplete="current-password" value="${S.loginP}" oninput="S.loginP=this.value" onkeydown="if(event.key==='Enter')doLogin()" style="width:100%;background:${CARD};border:0.5px solid ${BORDER};border-radius:14px;padding:15px 16px;font-size:16px;color:white;margin-bottom:24px;outline:none;"/>
+    <button onclick="doLogin()" style="width:100%;padding:16px;border-radius:14px;background:#5E5CE6;color:white;border:none;font-size:17px;font-weight:600;cursor:pointer;">Sign in</button>
+  </div>`;}
+
+function doLogin(){
+  if(typeof USERS!=='undefined'&&USERS[S.loginU.toLowerCase()]===S.loginP){
+    S.user=S.loginU.toLowerCase();S.loginErr=false;
+    fetchHistory().then(()=>{S.screen='home';render();});
+  }else{S.loginErr=true;render();}
+}
+
+function renderHome(){
+  const today=new Date().toLocaleDateString('nl-BE',{weekday:'long',day:'numeric',month:'long'});
+  const s=sess();
+  return`<div style="padding:env(safe-area-inset-top,20px) 16px 0;padding-top:max(env(safe-area-inset-top),20px)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+      <h1 style="font-size:30px;font-weight:700">Gym</h1>
+      <span style="color:${T2};font-size:13px">${S.user}</span>
+    </div>
+    <p style="color:${T2};font-size:14px;margin-bottom:28px">${today}</p>
+    <p style="font-size:11px;font-weight:600;color:${T2};text-transform:uppercase;letter-spacing:0.8px;margin-bottom:12px">Sessions</p>
+    ${Object.entries(s).map(([k,s])=>{
+      const last=S.history.find(h=>h.sessionKey===k);
+      const lastDate=last?new Date(last.date).toLocaleDateString('nl-BE',{day:'numeric',month:'short'}):'Never done';
+      return`<div onclick="startSession('${k}')" style="display:flex;align-items:center;gap:14px;background:${CARD};border:0.5px solid ${BORDER};border-radius:18px;padding:15px 16px;margin-bottom:10px;cursor:pointer;-webkit-tap-highlight-color:transparent;active:background:#2C2C2E">
+        <div style="width:48px;height:48px;border-radius:14px;background:${COLORS[k]||'#5E5CE6'}20;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:${COLORS[k]||'#5E5CE6'};flex-shrink:0">${k}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:600;font-size:16px">${s.name}</div>
+          <div style="font-size:12px;color:${T2};margin-top:2px">${s.exercises.length} exercises · ${lastDate}</div>
+        </div>
+        <i class="ti ti-chevron-right" style="color:${T2};font-size:18px"></i>
+      </div>`;
+    }).join('')}
+    <button onclick="S.screen='history';render()" style="width:100%;padding:14px;border-radius:14px;border:0.5px solid ${BORDER};background:transparent;color:white;font-size:15px;font-weight:500;cursor:pointer;margin-top:8px;margin-bottom:40px;display:flex;align-items:center;justify-content:center;gap:8px">
+      <i class="ti ti-history"></i> Workout history
+    </button>
+  </div>`;}
+
+function renderWorkout(){
+  const s=sess()[S.sessionKey];const c=col();
+  return`<div>
+    <div style="padding:max(env(safe-area-inset-top),14px) 16px 14px;display:flex;align-items:center;gap:12px;border-bottom:0.5px solid ${BORDER};background:${BG};position:sticky;top:0;z-index:5">
+      <button onclick="if(confirm('End workout without saving?')){S.screen='home';S.sessionKey=null;if(S.timerInterval){clearInterval(S.timerInterval);S.timerInterval=null;}render();}" style="background:none;border:none;color:${T2};cursor:pointer;padding:4px;display:flex">
+        <i class="ti ti-x" style="font-size:22px"></i>
+      </button>
+      <div style="flex:1">
+        <div style="font-size:12px;color:${T2}">Session ${S.sessionKey}</div>
+        <div style="font-size:17px;font-weight:600">${s.name}</div>
+      </div>
+      <div style="font-size:12px;background:${c}22;color:${c};padding:5px 12px;border-radius:20px;font-weight:600">${doneSets()}/${totalSets()}</div>
+      <button onclick="S.editMode=!S.editMode;render()" style="background:${S.editMode?c+'22':'rgba(255,255,255,0.07)'};border:none;color:${S.editMode?c:T2};padding:7px 12px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:500">${S.editMode?'Done':'Edit'}</button>
+    </div>
+    <div style="padding:12px 16px">
+      ${S.exercises.map(ex=>{
+        const sets=S.setData[ex.id]||[];
+        return`<div style="background:${CARD};border-radius:18px;margin-bottom:14px;overflow:hidden;border:0.5px solid ${BORDER}">
+          <div style="padding:13px 14px 10px;display:flex;align-items:center;gap:10px">
+            ${S.editMode?`<button onclick="removeExercise('${ex.id}')" style="width:24px;height:24px;border-radius:50%;background:#FF3B30;border:none;color:white;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="ti ti-minus" style="font-size:13px"></i></button>`:''}
+            <div style="flex:1;min-width:0">
+              <span style="font-weight:600;font-size:16px">${ex.name}</span>
+              ${ex.note?`<span style="font-size:12px;color:${T2};display:block;margin-top:1px">${ex.note}</span>`:''}
+            </div>
+            <span style="font-size:13px;color:${T2};flex-shrink:0">${ex.target}</span>
+          </div>
+          <div style="border-top:0.5px solid ${BORDER}">
+            <div style="display:grid;grid-template-columns:22px 56px 1fr 1fr 30px 30px;gap:0;padding:6px 14px;border-bottom:0.5px solid ${BORDER}">
+              <span style="font-size:10px;color:${T2};font-weight:600">Set</span>
+              <span style="font-size:10px;color:${T2};font-weight:600">Prev</span>
+              <span style="font-size:10px;color:${T2};font-weight:600;text-align:center">kg</span>
+              <span style="font-size:10px;color:${T2};font-weight:600;text-align:center">Reps</span>
+              <span></span><span></span>
+            </div>
+            ${sets.map((st,si)=>{
+              const nk=`${ex.id}-${si}`;const noteOpen=S.noteOpen[nk];
+              const prev=st.prevWeight?`${st.prevWeight}×${st.prevReps}`:'—';
+              return`<div style="background:${st.done?c+'15':'transparent'};transition:background 0.2s">
+                <div style="display:grid;grid-template-columns:22px 56px 1fr 1fr 30px 30px;gap:0;padding:9px 14px;align-items:center">
+                  <span style="font-size:14px;font-weight:600;color:${T2}">${si+1}</span>
+                  <span style="font-size:11px;color:${T2}">${prev}</span>
+                  <input data-w="${ex.id},${si}" type="number" value="${st.weight??''}" placeholder="${st.prevWeight??'—'}" step="0.5" inputmode="decimal"
+                    style="background:${CARD2};border:none;border-radius:9px;padding:7px 6px;color:white;font-size:16px;font-weight:600;width:100%;text-align:center;margin:0 3px;outline:none;"/>
+                  <input data-r="${ex.id},${si}" type="number" value="${st.reps??''}" placeholder="${st.prevReps??'—'}" inputmode="numeric"
+                    style="background:${CARD2};border:none;border-radius:9px;padding:7px 6px;color:white;font-size:16px;font-weight:600;width:100%;text-align:center;margin:0 3px;outline:none;"/>
+                  <button onclick="toggleNote('${nk}')" style="background:none;border:none;color:${noteOpen||st.note?c:T2};cursor:pointer;padding:4px;font-size:17px;display:flex;align-items:center;justify-content:center"><i class="ti ti-notes"></i></button>
+                  <button onclick="toggleDone('${ex.id}',${si})" style="background:${st.done?c:'rgba(255,255,255,0.08)'};border:none;border-radius:9px;width:28px;height:28px;cursor:pointer;color:white;display:flex;align-items:center;justify-content:center;font-size:14px">${st.done?'<i class="ti ti-check"></i>':'<i class="ti ti-circle"></i>'}</button>
+                </div>
+                ${noteOpen||st.note?`<div style="padding:0 14px 10px;display:flex;gap:8px;align-items:flex-start">
+                  <textarea data-n="${ex.id},${si}" placeholder="Add a note..." rows="2" style="flex:1;background:${CARD2};border:none;border-radius:10px;padding:9px 12px;color:white;font-size:14px;resize:none;outline:none;line-height:1.4;">${st.note}</textarea>
+                  <button onclick="removeSet('${ex.id}',${si})" style="background:rgba(255,59,48,0.15);border:none;border-radius:9px;color:#FF3B30;width:34px;height:34px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="ti ti-trash" style="font-size:15px"></i></button>
+                </div>`:''}
+              </div>`;
+            }).join('')}
+            <div style="padding:8px 14px 12px">
+              <button onclick="addSet('${ex.id}')" style="width:100%;padding:9px;border-radius:10px;border:0.5px dashed rgba(255,255,255,0.18);background:transparent;color:${T2};font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px"><i class="ti ti-plus" style="font-size:14px"></i> Add set</button>
+            </div>
+          </div>
+        </div>`;
+      }).join('')}
+      ${S.editMode?`<div style="background:${CARD};border-radius:18px;padding:14px;margin-bottom:14px;border:0.5px solid ${BORDER}">
+        ${S.showAddEx?`<div>
+          <input id="axn" type="text" placeholder="Exercise name" value="${S.addExName}" oninput="S.addExName=this.value" style="width:100%;background:${CARD2};border:none;border-radius:12px;padding:12px;color:white;font-size:15px;margin-bottom:8px;outline:none;"/>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+            <input type="text" placeholder="Target (3×10)" value="${S.addExTarget}" oninput="S.addExTarget=this.value" style="background:${CARD2};border:none;border-radius:12px;padding:12px;color:white;font-size:14px;outline:none;"/>
+            <input type="text" placeholder="Note" value="${S.addExNote}" oninput="S.addExNote=this.value" style="background:${CARD2};border:none;border-radius:12px;padding:12px;color:white;font-size:14px;outline:none;"/>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <button onclick="S.showAddEx=false;render()" style="padding:12px;border-radius:12px;border:0.5px solid ${BORDER};background:transparent;color:${T2};cursor:pointer;font-size:14px">Cancel</button>
+            <button onclick="addExercise()" style="padding:12px;border-radius:12px;border:none;background:${c};color:white;font-weight:600;cursor:pointer;font-size:14px">Add</button>
+          </div>
+        </div>`:`<button onclick="S.showAddEx=true;render()" style="width:100%;padding:12px;border-radius:12px;border:0.5px dashed rgba(255,255,255,0.18);background:transparent;color:${T2};cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;font-size:14px"><i class="ti ti-plus"></i> Add exercise</button>`}
+      </div>`:''}
+      <button onclick="finishSession()" style="width:100%;padding:16px;border-radius:16px;background:${c};color:white;border:none;font-size:17px;font-weight:600;cursor:pointer;margin-bottom:max(env(safe-area-inset-bottom,16px),16px)">Finish session</button>
+    </div>
+  </div>`;}
+
+function renderComplete(){
+  const dur=S.history[0]?.duration||0;const c=col();const s=sess()[S.sessionKey];
+  const exDone=S.exercises.filter(e=>(S.setData[e.id]||[]).some(x=>x.done)).length;
+  return`<div style="padding:40px 20px;text-align:center">
+    <div style="width:88px;height:88px;border-radius:50%;background:${c}20;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;box-shadow:0 0 40px ${c}30">
+      <i class="ti ti-trophy" style="font-size:40px;color:${c}"></i>
+    </div>
+    <h2 style="font-size:26px;font-weight:700;margin-bottom:8px">Session done!</h2>
+    <p style="color:${T2};font-size:15px;margin-bottom:32px">${s?.name} · ${new Date().toLocaleDateString('nl-BE',{day:'numeric',month:'long'})}</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:28px">
+      ${[{l:'Duration',v:dur+'m'},{l:'Exercises',v:exDone+'/'+S.exercises.length},{l:'Total sets',v:totalSets()}].map(st=>`
+        <div style="background:${CARD};border-radius:14px;padding:16px 8px">
+          <div style="font-size:24px;font-weight:700">${st.v}</div>
+          <div style="font-size:11px;color:${T2};margin-top:3px">${st.l}</div>
+        </div>`).join('')}
+    </div>
+    <div style="background:${CARD};border-radius:16px;padding:16px;margin-bottom:24px;text-align:left">
+      <div style="font-size:11px;font-weight:600;color:${T2};text-transform:uppercase;letter-spacing:0.7px;margin-bottom:12px">Exercise log</div>
+      ${S.exercises.filter(e=>(S.setData[e.id]||[]).length>0).map(e=>`
+        <div style="margin-bottom:8px;padding-bottom:8px;border-bottom:0.5px solid ${BORDER}">
+          <div style="font-size:13px;font-weight:600;margin-bottom:4px">${e.name}</div>
+          <div style="font-size:12px;color:${T2}">${(S.setData[e.id]||[]).map((s,i)=>`<span style="margin-right:8px">Set ${i+1}: ${s.weight??'—'}kg×${s.reps}</span>`).join('')}</div>
+        </div>`).join('')}
+    </div>
+    <button onclick="S.screen='home';render()" style="width:100%;padding:16px;border-radius:16px;background:${c};color:white;border:none;font-size:17px;font-weight:600;cursor:pointer">Back to sessions</button>
+  </div>`;}
+
+function renderHistory(){
+  return`<div style="padding:max(env(safe-area-inset-top),20px) 16px 0">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px">
+      <button onclick="S.screen='home';render()" style="background:none;border:none;color:${T2};cursor:pointer;padding:4px;display:flex"><i class="ti ti-arrow-left" style="font-size:24px"></i></button>
+      <h1 style="font-size:26px;font-weight:700">History</h1>
+    </div>
+    ${S.history.length===0?`<div style="text-align:center;padding:80px 0;color:${T2}"><i class="ti ti-clipboard" style="font-size:48px;display:block;margin-bottom:16px;opacity:0.3"></i>No workouts yet</div>`:
+    S.history.map(h=>{
+      const c=COLORS[h.sessionKey]||'#5E5CE6';
+      const total=Object.values(h.setData||{}).flat().length;
+      return`<div style="background:${CARD};border-radius:16px;padding:14px;margin-bottom:12px;border:0.5px solid ${BORDER}">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+          <div style="width:42px;height:42px;border-radius:12px;background:${c}20;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:${c};flex-shrink:0">${h.sessionKey}</div>
+          <div style="flex:1">
+            <div style="font-weight:600;font-size:15px">${h.sessionName||'Workout'}</div>
+            <div style="font-size:12px;color:${T2}">${h.date} · ${h.time} · ${h.duration}min · ${total} sets</div>
+          </div>
+        </div>
+        ${(h.exercises||[]).filter(e=>(h.setData||{})[e.id]?.length>0).slice(0,5).map(e=>`
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:0.5px solid ${BORDER}">
+            <span style="font-size:13px;color:${T2}">${e.name}</span>
+            <span style="font-size:12px;color:white">${(h.setData[e.id]||[]).map(s=>`${s.weight??'—'}×${s.reps}`).join(' · ')}</span>
+          </div>`).join('')}
+        ${(h.exercises||[]).filter(e=>(h.setData||{})[e.id]?.length>0).length>5?`<div style="font-size:12px;color:${T2};padding-top:8px">+${(h.exercises||[]).filter(e=>(h.setData||{})[e.id]?.length>0).length-5} more</div>`:''}
+      </div>`;
+    }).join('')}
+    <div style="height:40px"></div>
+  </div>`;}
+
+// Register service worker
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('sw.js').catch(()=>{});
+}
+
+// Init
+fetchHistory().catch(()=>loadHistory()).finally(()=>{S.screen='login';render();});
+</script>
+</body>
+</html>
