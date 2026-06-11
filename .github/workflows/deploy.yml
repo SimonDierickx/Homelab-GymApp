@@ -8,22 +8,12 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Deploy to webhosting VM
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "index.html,manifest.json,sw.js,icon-192.png,icon-512.png"
-          target: /var/www/sdckx/app/
-          strip_components: 0
-
-      - name: Reload nginx
+      - name: Pull latest on webhosting VM
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: sudo systemctl reload nginx
+          script: |
+            git -C /var/www/gymapp pull origin main
+            echo "Deployed $(git -C /var/www/gymapp rev-parse --short HEAD)"
