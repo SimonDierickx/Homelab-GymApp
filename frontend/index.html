@@ -64,7 +64,8 @@ const IC={
   logout:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>',
 };
 function ic(name,sz=20,col='currentColor'){
-  return`<span style="display:inline-flex;align-items:center;justify-content:center;width:${sz}px;height:${sz}px;color:${col};flex-shrink:0">${IC[name]||IC.x}</span>`;
+  const svg=(IC[name]||IC.x).replace('<svg ','<svg width="'+sz+'" height="'+sz+'" ');
+  return`<span style="display:inline-flex;align-items:center;justify-content:center;width:${sz}px;height:${sz}px;color:${col};flex-shrink:0">${svg}</span>`;
 }
 
 // ── Custom dialogs (iOS PWA safe) ───────────────────────────────────────────
