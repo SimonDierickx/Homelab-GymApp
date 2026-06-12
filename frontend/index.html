@@ -2,474 +2,1025 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no,maximum-scale=1"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 <meta name="apple-mobile-web-app-title" content="Gym"/>
-<meta name="theme-color" content="#0A0A0A"/>
-<title>Gym — sdckx</title>
+<meta name="theme-color" content="#000000"/>
+<title>Gym</title>
 <link rel="manifest" href="manifest.json"/>
 <link rel="apple-touch-icon" href="icon-192.png"/>
-<link rel="icon" href="icon-192.png"/>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css"/>
 <style>
-*{box-sizing:border-box;margin:0;padding:0;}
-html,body{background:#0A0A0A;color:#fff;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display',sans-serif;height:100%;overscroll-behavior:none;}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+html,body{background:#000;color:#fff;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display',sans-serif;height:100%;overscroll-behavior:none;}
 body{display:flex;flex-direction:column;max-width:430px;margin:0 auto;min-height:100dvh;}
-#main{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;}
-#timer-bar{position:sticky;bottom:0;z-index:10;display:none;}
-input,textarea,button{font-family:inherit;-webkit-appearance:none;appearance:none;}
+#scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+input,textarea,select,button{font-family:inherit;-webkit-appearance:none;appearance:none;}
 input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
 input[type=number]{-moz-appearance:textfield;}
 ::-webkit-scrollbar{display:none;}
-.page{animation:up 0.15s ease;}
-@keyframes up{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+.anim{animation:su 0.15s ease;}
+@keyframes su{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.sheet{position:fixed;inset:0;background:rgba(0,0,0,0.72);z-index:200;display:flex;align-items:flex-end;}
+.sheet-inner{width:100%;max-width:430px;margin:0 auto;background:#1C1C1E;border-radius:22px 22px 0 0;padding:20px 20px max(env(safe-area-inset-bottom),24px);max-height:90dvh;overflow-y:auto;}
 </style>
 </head>
 <body>
-<div id="main"></div>
-<div id="timer-bar"></div>
+<div id="scroll"></div>
+<div id="bottom-ui"></div><!-- timer strip + resume strip + tab bar -->
+<div id="sheet-root"></div>
+<div id="dlg-root"></div>
 <script src="config.js"></script>
 <script>
-const BG='#0A0A0A',CARD='#1C1C1E',CARD2='#2C2C2E',BORDER='rgba(255,255,255,0.09)',T2='rgba(255,255,255,0.45)';
-const COLORS={A:'#5E5CE6',B:'#FF6B35',C:'#30B37D',D:'#FF9F0A',E:'#FF2D55',F:'#32ADE6'};
+if(typeof USERS==='undefined')window.USERS={simon:'coach2024'};
+if(typeof API_KEY==='undefined')window.API_KEY='';
+if(typeof GYM_API==='undefined')window.GYM_API='/gym';
 
-const BASE_SESSIONS={
-A:{name:'Pull / Posterior chain',exercises:[
-  {id:'a1',name:'Band pull-apart',target:'2x20',note:'Straight arms, thumbs up, squeeze scapulas'},
-  {id:'a2',name:'Cat-cow',target:'4×4',note:'Full spinal range, slow'},
-  {id:'a3',name:'Thoracic rotation (half-kneeling)',target:'2x8',note:'Elbow toward ceiling'},
-  {id:'a4',name:'Hip 90/90 active transitions',target:'1x2',note:'Actively pull the hip into each position'},
-  {id:'a5',name:'Scapular wall slide',target:'2x10',note:'Keep forearms glued to wall'},
-  {id:'a6',name:'Dead hang',target:'2x30',note:'Relax everything'},
-  {id:'a7',name:'Med ball slam',target:'4x5',note:'Full triple extension, 90sec rest'},
-  {id:'a8',name:'Weighted Pull-Up',target:'4×4-6',note:'2min rest'},
-  {id:'a9',name:'Romanian Deadlift',target:'4x6-8',note:'2min rest'},
-  {id:'a10',name:'Single-Arm Dumbbell Row',target:'3x8-10',note:'60-90sec rest'},
-  {id:'a11',name:'Nordic Curl',target:'3×4-6',note:'Controlled eccentric'},
-  {id:'a12',name:'Chest-supported Y-raise',target:'3×12-15',note:'Prehab, 2sec hold'},
-  {id:'a13',name:'Face Pull',target:'3×15',note:'Prehab'},
-  {id:'a14',name:'Farmers Carry',target:'3×40',note:'90sec rest'},
-]},
-B:{name:'Push — Upper',exercises:[
-  {id:'b1',name:'Explosive Push-Up',target:'4×5',note:''},
-  {id:'b2',name:'Incline DB Press',target:'4×6',note:'Landmine if shoulder hurts'},
-  {id:'b3',name:'Dip',target:'3×8',note:''},
-  {id:'b4',name:'Lateral Raise',target:'3×15',note:''},
-  {id:'b5',name:'Overhead Tricep Ext.',target:'3×12',note:''},
-  {id:'b6',name:'Face Pull',target:'3×15',note:'Prehab'},
-  {id:'b7',name:'Incline Curl',target:'3×12',note:''},
-  {id:'b8',name:'Dead Bug',target:'3×8',note:''},
-]},
-C:{name:'Lower — Unilateral',exercises:[
-  {id:'c1',name:'Broad Jump',target:'4×3',note:''},
-  {id:'c2',name:'Bulgarian Split Squat',target:'4×7',note:'Manage knee depth'},
-  {id:'c3',name:'Step-Up',target:'3×8',note:''},
-  {id:'c4',name:'Cable Pull-Through',target:'3×12',note:''},
-  {id:'c5',name:'Single-Leg Hip Thrust',target:'3×10',note:''},
-  {id:'c6',name:'Tibialis Raise',target:'3×15',note:'Prehab'},
-  {id:'c7',name:'Single-Leg Calf Raise',target:'3×12',note:''},
-  {id:'c8',name:'Copenhagen Plank',target:'3×25',note:'seconds'},
-]},
-D:{name:'GPP — Support',exercises:[
-  {id:'d1',name:'Pogo Jump',target:'3×20',note:''},
-  {id:'d2',name:'Med Ball Slam',target:'4×5',note:''},
-  {id:'d3',name:'Farmer Carry',target:'3×30',note:'metres'},
-  {id:'d4',name:'Band Pull-Apart',target:'3×20',note:'Prehab'},
-  {id:'d5',name:'Pallof Press',target:'3×10',note:''},
-  {id:'d6',name:'Dead Bug',target:'3×8',note:''},
-  {id:'d7',name:'Copenhagen Plank',target:'3×20',note:'seconds'},
-  {id:'d8',name:'Face Pull',target:'3×15',note:''},
-]},
-E:{name:'Power — Explosive',exercises:[
-  {id:'e1',name:'Box Jump',target:'5×3',note:'Max effort'},
-  {id:'e2',name:'Depth Drop → Broad Jump',target:'4×3',note:''},
-  {id:'e3',name:'Med Ball Rotational Throw',target:'4×5',note:''},
-  {id:'e4',name:'Explosive Push-Up',target:'4×5',note:''},
-  {id:'e5',name:'KB Swing',target:'4×10',note:''},
-  {id:'e6',name:'Lateral Bound',target:'3×5',note:''},
-]},
-F:{name:'Hip Prehab',exercises:[
-  {id:'f1',name:'Hip 90/90 Mobility',target:'3×10',note:''},
-  {id:'f2',name:'Single-Leg Hip Thrust',target:'3×12',note:''},
-  {id:'f3',name:'Cable Hip Flexion',target:'3×12',note:''},
-  {id:'f4',name:'Lateral Band Walk',target:'3×15',note:''},
-  {id:'f5',name:'Copenhagen Plank',target:'3×30',note:'seconds'},
-  {id:'f6',name:"World's Greatest Stretch",target:'2×5',note:''},
-  {id:'f7',name:'Glute Bridge',target:'3×15',note:''},
-]}};
+// ── Tokens ──────────────────────────────────────────────────────────────────
+const T='#4DD9D4',C1='#1C1C1E',C2='#2C2C2E';
+const T2='rgba(255,255,255,0.42)',T3='rgba(255,255,255,0.15)',DIV='rgba(255,255,255,0.1)';
+const CIRC=2*Math.PI*110;
 
-let S={
-  screen:'login',user:null,loginU:'',loginP:'',loginErr:false,
-  sessionKey:null,exercises:[],setData:{},prevWorkout:null,
-  history:[],startTime:null,editMode:false,
-  timerSec:90,timerRemain:90,timerRunning:false,timerInterval:null,
-  noteOpen:{},swipeActive:null,
-  addExName:'',addExTarget:'3×10',addExNote:'',showAddEx:false,
-  customSessions:{}
+// ── Icons ───────────────────────────────────────────────────────────────────
+const IC={
+  back:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>',
+  cr:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>',
+  x:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>',
+  down:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>',
+  plus:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+  dots:'<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>',
+  clock:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>',
+  play:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 4l14 8-14 8z"/></svg>',
+  pause:'<svg viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="3" width="5" height="18" rx="1.5"/><rect x="14" y="3" width="5" height="18" rx="1.5"/></svg>',
+  history:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 8v4l3 3M3.05 11a9 9 0 101.49-4.7L1 4v5h5L3.5 6.3"/></svg>',
+  note:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>',
+  info:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>',
+  log:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M8 3H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2h-2M8 3a2 2 0 012 2h4a2 2 0 002-2M8 3a2 2 0 012-2h4a2 2 0 012 2"/><path d="M9 12h6M9 16h4"/></svg>',
+  list:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>',
+  chart:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="12" width="4" height="9" rx="1"/><rect x="10" y="7" width="4" height="14" rx="1"/><rect x="17" y="3" width="4" height="18" rx="1"/></svg>',
+  user:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-3.314 3.582-6 8-6s8 2.686 8 6"/></svg>',
+  key:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.778 7.778 5.5 5.5 0 017.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>',
+  pencil:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>',
+  logout:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>',
+};
+function ic(name,sz=20,col='currentColor'){
+  return`<span style="display:inline-flex;align-items:center;justify-content:center;width:${sz}px;height:${sz}px;color:${col};flex-shrink:0">${IC[name]||IC.x}</span>`;
+}
+
+// ── Custom dialogs (iOS PWA safe) ───────────────────────────────────────────
+function dlg(html){const r=document.getElementById('dlg-root');r.innerHTML=html;}
+function closeDlg(){dlg('');}
+function showConfirm(msg,onYes,yesLabel='Confirm',danger=true){
+  dlg(`<div style="position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:500;display:flex;align-items:flex-end">
+    <div style="width:100%;max-width:430px;margin:0 auto;background:${C1};border-radius:22px 22px 0 0;padding:24px 20px max(env(safe-area-inset-bottom),24px)">
+      <div style="font-size:16px;line-height:1.5;margin-bottom:22px">${msg}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <button onclick="closeDlg()" style="padding:14px;border-radius:14px;border:0.5px solid ${DIV};background:transparent;color:rgba(255,255,255,0.7);font-size:16px;cursor:pointer">Cancel</button>
+        <button id="dlg-yes" style="padding:14px;border-radius:14px;border:none;background:${danger?'#FF3B30':T};color:${danger?'white':'#000'};font-size:16px;font-weight:600;cursor:pointer">${yesLabel}</button>
+      </div>
+    </div>
+  </div>`);
+  document.getElementById('dlg-yes').onclick=()=>{closeDlg();onYes&&onYes();};
+}
+function showAlert(msg){
+  dlg(`<div style="position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:500;display:flex;align-items:flex-end">
+    <div style="width:100%;max-width:430px;margin:0 auto;background:${C1};border-radius:22px 22px 0 0;padding:24px 20px max(env(safe-area-inset-bottom),24px)">
+      <div style="font-size:16px;line-height:1.5;margin-bottom:22px">${msg}</div>
+      <button onclick="closeDlg()" style="width:100%;padding:14px;border-radius:14px;border:none;background:${T};color:#000;font-size:16px;font-weight:700;cursor:pointer">OK</button>
+    </div>
+  </div>`);
+}
+
+// ── Sessions ─────────────────────────────────────────────────────────────────
+const BASE={
+A:{name:'Pull — Posterior Chain',notes:'Primary: pulling strength, posterior chain, grip. Transfer: punch power, clinch, running posture. Fatigue: moderate-high.',exercises:[
+  {id:'a1',name:'Med Ball Slam',sets:4,rest:'1 min 30',rep:'5',note:'Full triple extension, catch on bounce, reset each rep. Not rapid-fire.',w:false},
+  {id:'a2',name:'Weighted Pull-Up',sets:4,rest:'2 min',rep:'4-6',note:'Dead hang at bottom, 3s eccentric. Neutral grip if shoulder irritated. No kipping.',w:true},
+  {id:'a3',name:'Romanian Deadlift',sets:4,rest:'2 min',rep:'6-8',note:'3s eccentric — hips back hard, bar close to shins, neutral spine. Trap bar preferred.',w:true},
+  {id:'a4',name:'Single-Arm DB Row',sets:3,rest:'90 sec',rep:'8-10/s',note:'Elbow to hip (not ceiling), 3s eccentric. Full protraction at bottom.',w:true},
+  {id:'a5',name:'Nordic Hamstring Curl',sets:3,rest:'90 sec',rep:'4-6',note:'Eccentric only — resist the fall, catch with hands. Stop when control breaks.',w:false},
+  {id:'a6',name:'Chest-Supported Y-Raise',sets:3,rest:'60 sec',rep:'12-15',note:'Thumbs up, Y shape, 2s hold at top. Shoulder prehab — quality over load.',w:true},
+  {id:'a7',name:'Cable Face Pull',sets:3,rest:'60 sec',rep:'15',note:'Rope to forehead, elbows high and wide. Light load — shoulder health.',w:true},
+  {id:'a8',name:'Farmer Carry',sets:3,rest:'90 sec',rep:'40m',note:'Heavy — tall posture, braced core, feet quiet. No shoulder shrug.',w:true},
+  {id:'a9',name:'Neck Isometric Circuit',sets:3,rest:'30 sec',rep:'10s × 4 dir',note:'Manual pressure: flexion, extension, lateral L/R. Fight prep — not optional.',w:false},
+  {id:'a10',name:'Pallof Press',sets:3,rest:'60 sec',rep:'8/s',note:'2s pause at full extension. Zero trunk rotation.',w:true},
+  {id:'a11',name:'Dead Bug',sets:3,rest:'45 sec',rep:'6/s',note:'Press lower back into floor actively. 3s out, 3s return. Stop if lower back lifts.',w:false},
+]},
+B:{name:'Push — Upper Body Power',notes:'Primary: pushing force, upper body power, punch mechanics. Left shoulder is THE key constraint. Landmine press is the anchor — keep it even if other blocks are shortened.',exercises:[
+  {id:'b1',name:'Plyometric Push-Up',sets:4,rest:'90 sec',rep:'4',note:'Both hands leave floor. Land soft, absorb. Full reset between reps — not rapid-fire. Replace with med ball chest pass if shoulder irritated.',w:false},
+  {id:'b2',name:'Landmine Press',sets:4,rest:'90 sec',rep:'6-8/s',note:'Kneeling or split-stance. Press at forward diagonal — not straight overhead. Mimics punch mechanics. Priority movement for shoulder safety.',w:true},
+  {id:'b3',name:'Incline Dumbbell Press',sets:4,rest:'2 min',rep:'8-10',note:'Bench 30-45°. 3s eccentric. Drive up powerfully. STOP if shoulder pain — replace with floor press.',w:true},
+  {id:'b4',name:'Seated Cable Row',sets:3,rest:'90 sec',rep:'10-12',note:'Close/neutral grip. Pull to lower sternum. Full scapular retraction, hold 1s. Balance pressing volume.',w:true},
+  {id:'b5',name:'Rope Triceps Pushdown',sets:3,rest:'60 sec',rep:'12-15',note:'Full extension at bottom, spread rope slightly. Elbows fixed at sides.',w:true},
+  {id:'b6',name:'Serratus Push-Up',sets:3,rest:'60 sec',rep:'10-12',note:'Push further at top of every rep — full protraction, round upper back. Scapular winging fix. From wall if shoulder sensitive.',w:false},
+  {id:'b7',name:'Cable Lateral Raise',sets:3,rest:'45 sec',rep:'15',note:'Light — structural. 2s hold at shoulder height. No swinging.',w:true},
+  {id:'b8',name:'Cable External Rotation',sets:3,rest:'45 sec',rep:'15/s',note:'Elbow 90°, rotate out, 1s hold at end range. Direct bursitis management — do not skip.',w:true},
+  {id:'b9',name:'Rotational Med Ball Throw',sets:3,rest:'45 sec',rep:'6/s',note:'Stand sideways. Pivot back foot, drive from hips — arms follow. Punch mechanics.',w:false},
+  {id:'b10',name:'Cable Wood Chop',sets:3,rest:'60 sec',rep:'8/s',note:'High to low diagonal. Trunk rotation — not arm pull. 1s hold at end range.',w:true},
+  {id:'b11',name:'Neck Isometric Circuit',sets:3,rest:'30 sec',rep:'10s × 4 dir',note:'Manual pressure: flexion, extension, lateral L/R. Fight prep.',w:false},
+]},
+C:{name:'Lower — Unilateral / Resilience',notes:'Primary: unilateral leg strength, single-leg power, posterior chain resilience. HIGH fatigue cost. SCHEDULING RULE: do NOT place day before/of long run, track session, or major sparring.',exercises:[
+  {id:'c1',name:'Box Jump',sets:5,rest:'90 sec',rep:'3',note:'Step down after each rep. Full triple extension at takeoff. Full pause and reset — not plyometric endurance.',w:false},
+  {id:'c2',name:'Pogo Jump',sets:3,rest:'45 sec',rep:'10',note:'Minimal ground contact. Stay tall — do not squat between hops. Small amplitude, fast and springy.',w:false},
+  {id:'c3',name:'Bulgarian Split Squat',sets:4,rest:'90 sec',rep:'6-8/s',note:'3s eccentric. Drive through heel. Hip crease below knee if possible. Front knee: if pain increases, reduce load — do not skip.',w:true},
+  {id:'c4',name:'Single-Leg RDL',sets:4,rest:'90 sec',rep:'8/s',note:'Contralateral dumbbell. Hip hinge back, flat back. 1s pause at bottom. Return to balanced position before next rep.',w:true},
+  {id:'c5',name:'Step-Up',sets:3,rest:'60 sec',rep:'8-10/s',note:'Knee to mid-thigh height box. Drive through heel — do not push off back foot. Full hip extension at top.',w:true},
+  {id:'c6',name:'Hip Thrust',sets:3,rest:'60 sec',rep:'10-12',note:'Shoulders on bench. Full hip extension, 1s hold. Glutes squeeze, ribs down — no excessive lumbar arch. Single-leg OK.',w:true},
+  {id:'c7',name:'Nordic Hamstring Curl',sets:3,rest:'90 sec',rep:'4-6',note:'Eccentric only — resist the fall as long as possible. Stop when descent speed increases uncontrollably. Band-assisted OK.',w:false},
+  {id:'c8',name:'Tibialis Raise',sets:3,rest:'45 sec',rep:'15-20',note:'Heels on step, back against wall. Lift toes, 1s hold at top. Shin conditioning for running volume — not optional.',w:false},
+  {id:'c9',name:'Single-Leg Calf Raise',sets:3,rest:'45 sec',rep:'12-15/s',note:'Full range — full stretch at bottom, full plantarflexion at top. 2s hold. Add load when easy.',w:false},
+  {id:'c10',name:'Copenhagen Plank',sets:3,rest:'60 sec',rep:'20s/s',note:'Top leg on bench, body straight. Adductor strength + hip stability. Direct kick power transfer.',w:false},
+  {id:'c11',name:'Banded Lateral Walk',sets:2,rest:'45 sec',rep:'15m/dir',note:'Band above knees or ankles. Slight squat throughout — do not stand between steps. Glute med for running gait.',w:false},
+  {id:'c12',name:'Dead Bug',sets:3,rest:'45 sec',rep:'6/s',note:'Lower back pressed into floor. 3s out, 3s return. Stop if lower back lifts.',w:false},
+]},
+D:{name:'GPP — Athletic Support',notes:'Primary: general preparedness, carries, med ball. LOWEST fatigue cost. Use in fight camp, heavy weeks, or double-session days. Does NOT replace A/B/C/E/F.',exercises:[
+  {id:'d1',name:'Med Ball Slam',sets:4,rest:'60 sec',rep:'6',note:'Full triple extension, aggressive hip snap. Breathe out on every slam.',w:false},
+  {id:'d2',name:'Rotational Med Ball Throw',sets:4,rest:'45 sec',rep:'6/s',note:'Stand sideways to wall. Pivot back foot, drive rotation from hips. Arms follow trunk.',w:false},
+  {id:'d3',name:'Overhead Forward Throw',sets:3,rest:'60 sec',rep:'5',note:'Like a goalkeeper throw — full body, drive forward, step into it. Same motor pattern as punch combos.',w:false},
+  {id:'d4',name:'Farmer Carry',sets:3,rest:'90 sec',rep:'40m',note:'Heavy — tall spine, braced core, feet quiet. Grip, trapezius, and trunk stiffness.',w:true},
+  {id:'d5',name:'Single-Arm Overhead Carry',sets:3,rest:'60 sec',rep:'20m/s',note:'Arm locked overhead, shoulder packed. Only if shoulder not flaring — replace with rack carry if irritated.',w:true},
+  {id:'d6',name:'Bear Hug Carry',sets:2,rest:'60 sec',rep:'30m',note:'Squeeze heavy load to chest. Mimics clinch grip. Sub: KB goblet carry.',w:true},
+  {id:'d7',name:'Band Y-Raise (Prone)',sets:3,rest:'45 sec',rep:'15',note:'Chest on bench or floor. Y shape, thumbs up. 2s raise, 1s hold. Shoulder prehab — mandatory.',w:false},
+  {id:'d8',name:'Copenhagen Plank',sets:3,rest:'60 sec',rep:'20s/s',note:'Top leg on bench, body straight. Adductor + hip stability.',w:false},
+  {id:'d9',name:'Nordic Isometric Hold',sets:3,rest:'60 sec',rep:'30s',note:'Feet anchored, hold upright position using hamstrings. Lean forward slightly if too easy.',w:false},
+  {id:'d10',name:'Tibialis Raise',sets:3,rest:'45 sec',rep:'15',note:'Shin conditioning for running durability.',w:false},
+  {id:'d11',name:'Hip 90/90 Active Transitions',sets:1,rest:'0 sec',rep:'2 min',note:'Switch every 10s. Pull each position actively — no passive hanging.',w:false},
+  {id:'d12',name:'Cossack Squat to Deep Lunge',sets:1,rest:'0 sec',rep:'5/s',note:'Slow through full range. KB as counterbalance if needed.',w:false},
+  {id:'d13',name:'Pallof Press',sets:3,rest:'60 sec',rep:'8/s',note:'2s pause at full extension. Zero trunk rotation.',w:true},
+  {id:'d14',name:'Neck Isometrics',sets:3,rest:'30 sec',rep:'10s × 4 dir',note:'Manual pressure, 4 directions — fight prep.',w:false},
+]},
+E:{name:'Power — Explosive Full Body',notes:'Primary: CNS-intensive power output — QUALITY over volume. Do not place day of/before hard sparring or long runs. If CNS flat: reduce volume, maintain intent.',exercises:[
+  {id:'e1',name:'Broad Jump',sets:5,rest:'90 sec',rep:'3',note:'Maximum horizontal distance. Full pause and reset between reps. Absorb landing fully.',w:false},
+  {id:'e2',name:'Box Jump',sets:5,rest:'90 sec',rep:'3',note:'Step down after each rep. Full triple extension. Focus on SPEED of takeoff, not height alone.',w:false},
+  {id:'e3',name:'Lateral Bound',sets:3,rest:'60 sec',rep:'4/s',note:'Explosive push off one foot, land on opposite, hold stable 2s. Single-leg lateral power for pivoting and kicks.',w:false},
+  {id:'e4',name:'Trap Bar Deadlift',sets:4,rest:'2 min 30',rep:'4-5',note:'70-80% max — SPEED lift. Reset each rep. Bar must accelerate floor to lockout. If no trap bar: conventional from slight elevation.',w:true},
+  {id:'e5',name:'Weighted Pull-Up (Explosive)',sets:4,rest:'2 min',rep:'4-5',note:'Dip belt. Explosive concentric — treat each rep as competition. 3s eccentric. Neutral grip for left shoulder.',w:true},
+  {id:'e6',name:'Landmine Row',sets:3,rest:'90 sec',rep:'5-6/s',note:'Feet staggered, torso parallel to floor. Pull elbow HIGH and BACK as fast as possible. Punch and clinch mechanics.',w:true},
+  {id:'e7',name:'Single-Leg Box Jump',sets:3,rest:'90 sec',rep:'4/s',note:'Take off AND land on same leg. Hold landing 2s. Build landing stability in Session C first.',w:false},
+  {id:'e8',name:'Rotational Med Ball Throw',sets:3,rest:'60 sec',rep:'6/s',note:'Maximum intent on every throw — this is power training, not warm-down.',w:false},
+  {id:'e9',name:'Pallof Press',sets:3,rest:'60 sec',rep:'8/s',note:'2s pause at full extension. Resist rotation — increase load if too easy.',w:true},
+  {id:'e10',name:'Neck Isometric Circuit',sets:3,rest:'30 sec',rep:'10s × 4 dir',note:'Fight preparation — mandatory every session.',w:false},
+]},
+F:{name:'Hip / Structural / Prehab',notes:'Primary: hip mobility and strength, shoulder prehab. LOWEST systemic fatigue. Best: morning before evening kickboxing, after hard runs, or fight camp maintenance.',exercises:[
+  {id:'f1',name:'Hip 90/90 IR Lift-Off',sets:3,rest:'60 sec',rep:'5/s',note:'PAILs/RAILs: push shin into floor 5s, then lift off 2s. Most important exercise for kick mechanics (hip internal rotation).',w:false},
+  {id:'f2',name:'Couch Stretch (Active)',sets:2,rest:'0 sec',rep:'2 min/s',note:'Rear foot on bench. Squeeze glute of rear leg hard, hold 5s, release. Active contraction — NOT passive stretch.',w:false},
+  {id:'f3',name:'Side-Lying Hip Rotation',sets:3,rest:'30 sec',rep:'10/s',note:'Lie on side, hips stacked, knees 90°. Top knee drops away (external rotation). Controlled return. Watch lower back compensation.',w:false},
+  {id:'f4',name:'Standing Hip CARs',sets:2,rest:'30 sec',rep:'5/s',note:'Full hip circle as large as possible. 5s per full rotation. Maximize range at every point.',w:false},
+  {id:'f5',name:'Bulgarian Split Squat',sets:3,rest:'90 sec',rep:'8-10/s',note:'Moderate load — priority is DEPTH and ROM, not weight. 3s eccentric.',w:true},
+  {id:'f6',name:'Single-Leg Hip Thrust',sets:3,rest:'60 sec',rep:'10/s',note:'Shoulders on bench. Full extension, 1s pause. Glute fully contracted — no lumbar arch compensation.',w:true},
+  {id:'f7',name:'Banded Clamshell',sets:3,rest:'45 sec',rep:'15/s',note:'2s open, 1s hold at top, 2s close — resist band on way down.',w:false},
+  {id:'f8',name:'Copenhagen Plank',sets:3,rest:'60 sec',rep:'25-30s/s',note:'Top leg on bench, hips level. Adductor + hip stability — direct kick power.',w:false},
+  {id:'f9',name:'Wall Slide',sets:3,rest:'45 sec',rep:'10',note:'Forearms on wall, slide to overhead. Push further at top — scapular upward rotation. Primary exercise for shoulder rehab.',w:false},
+  {id:'f10',name:'Band Y-Raise (Prone)',sets:3,rest:'45 sec',rep:'15',note:'Chest on bench, thumbs up, 2s raise, 1s hold. Lower trap and serratus — scapular dyskinesia correction.',w:false},
+  {id:'f11',name:'External Rotation',sets:3,rest:'45 sec',rep:'15/s',note:'Elbow 90°, 1s hold at end range. Direct bursitis management — treatment protocol. Do not skip.',w:true},
+  {id:'f12',name:'Serratus Push-Up',sets:3,rest:'45 sec',rep:'10-12',note:'Push further at top — full protraction. From wall if sensitivity high.',w:false},
+  {id:'f13',name:'Tibialis Raise',sets:3,rest:'45 sec',rep:'20',note:'Full range, 1s hold at top. Shin health for running.',w:false},
+  {id:'f14',name:'Single-Leg Calf Raise',sets:3,rest:'45 sec',rep:'15/s',note:'Full range, 2s hold at top.',w:false},
+  {id:'f15',name:'Dead Bug',sets:3,rest:'45 sec',rep:'8/s',note:'Lower back actively into floor. 3s out, 3s return.',w:false},
+]},
 };
 
-function parsePres(t){const m=t.match(/(\d+)[×x](\d+)/);return m?{sets:+m[1],reps:+m[2]}:{sets:3,reps:8};}
-function col(){return COLORS[S.sessionKey]||'#5E5CE6';}
-function sess(){return{...BASE_SESSIONS,...S.customSessions};}
-function fmt(n){const m=Math.floor(n/60),s=n%60;return m+':'+(s<10?'0'+s:s);}
-function totalSets(){return Object.values(S.setData).flat().length;}
-function doneSets(){return Object.values(S.setData).flat().filter(x=>x.done).length;}
+// ── State ────────────────────────────────────────────────────────────────────
+let S={
+  screen:'login',tab:'routines',
+  user:null,loginU:'',loginP:'',loginErr:false,
+  activeKey:null,logDetail:null,
+  wk:null,wkMinimized:false,
+  timer:{total:120,remain:120,running:false,iv:null},
+  timerStrip:false,
+  history:[],prevSet:{},customSessions:{},
+  editMode:false,menuEx:null,menuSet:null,
+  sheet:null,sheetData:{}
+};
 
-// Storage helpers
-function storageKey(user){return`gym_history_${user}`;}
-async function loadHistory(){
-  try{
-    const k=storageKey(S.user);
-    const r=await window.storage.get(k);
-    S.history=r?JSON.parse(r.value):[];
-  }catch{S.history=[];}
-}
-async function saveHistory(entry){
-  await loadHistory();
-  S.history.unshift(entry);
-  if(S.history.length>100)S.history=S.history.slice(0,100);
-  await window.storage.set(storageKey(S.user),JSON.stringify(S.history));
-}
+// ── Helpers ──────────────────────────────────────────────────────────────────
+const allS=()=>({...BASE,...S.customSessions});
+const fmtT=n=>`${String(Math.floor(n/60)).padStart(2,'0')}:${String(n%60).padStart(2,'0')}`;
+const pv=(key,exId)=>(S.prevSet[key]||{})[exId]||[];
+const genId=()=>'x'+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
+const TOP='max(env(safe-area-inset-top),20px)';
+const BOT='max(env(safe-area-inset-bottom),8px)';
+const nextKey=()=>{const u=new Set(Object.keys(allS()));for(let c=65;c<=90;c++){const k=String.fromCharCode(c);if(!u.has(k))return k;}return 'Z'+Date.now();};
 
-// API call to VM backend
-async function postWorkout(entry){
-  try{
-    const r=await fetch(GYM_API+'/save',{
-      method:'POST',
-      headers:{'Content-Type':'application/json','X-API-Key':API_KEY},
-      body:JSON.stringify(entry)
-    });
-    if(!r.ok)console.error('API save failed:',r.status);
-  }catch(e){console.error('API error:',e);}
-}
-async function fetchHistory(){
-  try{
-    const r=await fetch(GYM_API+'/history?user='+S.user,{headers:{'X-API-Key':API_KEY}});
-    if(r.ok){const d=await r.json();S.history=d;}
-  }catch{await loadHistory();}
-}
-
-function initSetData(exercises,prev){
-  const d={};
-  exercises.forEach(ex=>{
-    const {sets,reps}=parsePres(ex.target);
-    const prevEx=prev?.setData?.[ex.id]||[];
-    d[ex.id]=Array.from({length:sets},(_,i)=>({
-      weight:prevEx[i]?.weight??null,reps:prevEx[i]?.reps??reps,
-      note:'',done:false,prevWeight:prevEx[i]?.weight??null,prevReps:prevEx[i]?.reps??null
-    }));
+function displayName(){return localStorage.getItem('gym_alias_'+S.user)||S.user||'';}
+function checkPwd(u,p){const ov=JSON.parse(localStorage.getItem('gym_creds_ov')||'{}');return(ov[u]||USERS[u])===p;}
+function setPwd(u,p){const ov=JSON.parse(localStorage.getItem('gym_creds_ov')||'{}');ov[u]=p;localStorage.setItem('gym_creds_ov',JSON.stringify(ov));}
+function setAlias(u,a){if(a.trim())localStorage.setItem('gym_alias_'+u,a.trim());}
+// Credentials for display-name changed usernames
+function getLoginKey(input){
+  // Check if any user has input as alias
+  Object.keys({...USERS,...JSON.parse(localStorage.getItem('gym_creds_ov')||'{}')}).forEach(u=>{
+    if(localStorage.getItem('gym_alias_'+u)===input)input=u;
   });
-  return d;
+  return input.toLowerCase();
 }
 
-function startSession(key){
-  const s=sess()[key];if(!s)return;
-  const prev=S.history.find(h=>h.sessionKey===key)||null;
-  S.sessionKey=key;S.exercises=[...s.exercises];
-  S.prevWorkout=prev;S.setData=initSetData(S.exercises,prev);
-  S.startTime=Date.now();S.editMode=false;S.addExName='';S.showAddEx=false;
-  S.screen='workout';render();
+// ── Persistence ──────────────────────────────────────────────────────────────
+const pk=k=>'gym_'+k+'_'+S.user;
+function persist(){
+  try{
+    localStorage.setItem(pk('h'),JSON.stringify(S.history.map(h=>({...h,date:h.date.toISOString()}))));
+    localStorage.setItem(pk('p'),JSON.stringify(S.prevSet));
+    localStorage.setItem(pk('c'),JSON.stringify(S.customSessions));
+  }catch{}
+}
+function load(){
+  try{
+    const h=localStorage.getItem(pk('h'));if(h)S.history=JSON.parse(h).map(x=>({...x,date:new Date(x.date)}));
+    const p=localStorage.getItem(pk('p'));if(p)S.prevSet=JSON.parse(p);
+    const c=localStorage.getItem(pk('c'));if(c)S.customSessions=JSON.parse(c);
+  }catch{}
 }
 
-function toggleDone(exId,si){S.setData[exId][si].done=!S.setData[exId][si].done;render();}
-function updateW(exId,si,v){S.setData[exId][si].weight=v===''?null:parseFloat(v)||null;}
-function updateR(exId,si,v){S.setData[exId][si].reps=parseInt(v)||0;}
-function updateNote(exId,si,v){S.setData[exId][si].note=v;}
-function addSet(exId){
-  const prev=S.setData[exId].slice(-1)[0]||{weight:null,reps:parsePres(S.exercises.find(e=>e.id===exId).target).reps};
-  S.setData[exId].push({weight:prev.weight,reps:prev.reps,note:'',done:false,prevWeight:null,prevReps:null});
-  render();
-}
-function removeSet(exId,si){S.setData[exId].splice(si,1);render();}
-function toggleNote(key){S.noteOpen[key]=!S.noteOpen[key];render();}
-function removeExercise(id){if(!confirm('Remove exercise?'))return;S.exercises=S.exercises.filter(e=>e.id!==id);delete S.setData[id];render();}
-function addExercise(){
-  if(!S.addExName.trim())return;
-  const id='cx'+Date.now();
-  const ex={id,name:S.addExName,target:S.addExTarget,note:S.addExNote};
-  S.exercises.push(ex);
-  const{sets,reps}=parsePres(S.addExTarget);
-  S.setData[id]=Array.from({length:sets},()=>({weight:null,reps,note:'',done:false,prevWeight:null,prevReps:null}));
-  S.addExName='';S.addExTarget='3×10';S.addExNote='';S.showAddEx=false;render();
+// ── API ───────────────────────────────────────────────────────────────────────
+async function apiPost(path,body){
+  if(!API_KEY)return;
+  try{await fetch(GYM_API+path,{method:'POST',headers:{'Content-Type':'application/json','X-API-Key':API_KEY},body:JSON.stringify(body)});}
+  catch{/*offline/unconfigured*/}
 }
 
-async function finishSession(){
-  const dur=Math.round((Date.now()-S.startTime)/60000);
-  const now=new Date();
-  const entry={
-    id:Date.now(),
-    user:S.user,
-    date:now.toISOString().split('T')[0],
-    datetime:now.toISOString(),
-    time:now.toLocaleTimeString('nl-BE',{hour:'2-digit',minute:'2-digit'}),
-    sessionKey:S.sessionKey,
-    sessionName:sess()[S.sessionKey]?.name,
-    duration:dur,
-    setData:JSON.parse(JSON.stringify(S.setData)),
-    exercises:S.exercises.map(e=>({id:e.id,name:e.name,target:e.target}))
-  };
-  await saveHistory(entry);
-  await postWorkout(entry);
-  if(S.timerInterval){clearInterval(S.timerInterval);S.timerInterval=null;}
-  S.timerRunning=false;
-  document.getElementById('timer-bar').style.display='none';
-  S.screen='complete';render();
-}
-
-// Timer
+// ── Timer ─────────────────────────────────────────────────────────────────────
 function timerStart(){
-  if(S.timerRunning)return;
+  if(S.timer.running)return;
   if('Notification' in window&&Notification.permission==='default')Notification.requestPermission();
-  S.timerRunning=true;
-  S.timerInterval=setInterval(()=>{
-    S.timerRemain--;
-    if(S.timerRemain<=0){
-      S.timerRemain=0;S.timerRunning=false;clearInterval(S.timerInterval);S.timerInterval=null;
+  S.timer.running=true;
+  S.timer.iv=setInterval(()=>{
+    S.timer.remain=Math.max(0,S.timer.remain-1);
+    if(S.timer.remain===0){
+      S.timer.running=false;clearInterval(S.timer.iv);S.timer.iv=null;
       if('Notification' in window&&Notification.permission==='granted')
-        new Notification('Rest done! 💪',{body:'Time for your next set.',icon:'icon-192.png'});
-      if(navigator.vibrate)navigator.vibrate([300,100,300]);
+        new Notification('Rest done! 💪',{body:'Next set — go!',icon:'icon-192.png'});
+      if(navigator.vibrate)navigator.vibrate([400,100,400]);
     }
-    renderTimer();
+    if(S.screen==='timer')rCircle();else rStrip();
   },1000);
 }
-function timerPause(){S.timerRunning=false;clearInterval(S.timerInterval);S.timerInterval=null;renderTimer();}
-function timerReset(sec){
-  S.timerRunning=false;clearInterval(S.timerInterval);S.timerInterval=null;
-  if(sec)S.timerSec=sec;
-  S.timerRemain=S.timerSec;renderTimer();
+function timerPause(){S.timer.running=false;clearInterval(S.timer.iv);S.timer.iv=null;if(S.screen==='timer')rCircle();else rStrip();}
+function timerSet(s){if(S.timer.iv)clearInterval(S.timer.iv);S.timer.iv=null;S.timer.running=false;S.timer.total=s;S.timer.remain=s;if(S.screen==='timer')rCircle();else rStrip();}
+function timerAdj(d){S.timer.remain=Math.max(0,S.timer.remain+d);if(S.timer.remain>S.timer.total)S.timer.total=S.timer.remain;rCircle();}
+function openTimer(){S.timerStrip=true;S.screen='timer';render();}
+function closeTimer(){S.screen='workout';render();}
+function hideStrip(){S.timerStrip=false;if(S.timer.running)timerPause();render();}
+function rCircle(){
+  const el=document.getElementById('tc');if(!el)return;
+  const pct=S.timer.total>0?S.timer.remain/S.timer.total:0;
+  const off=CIRC*(1-pct);
+  const col=S.timer.remain<=10?'#FF3B30':S.timer.remain<=30?'#FF9F0A':T;
+  el.innerHTML=`<svg width="260" height="260" viewBox="0 0 260 260">
+    <circle cx="130" cy="130" r="110" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="10"/>
+    <circle cx="130" cy="130" r="110" fill="none" stroke="${col}" stroke-width="10" stroke-linecap="round"
+      stroke-dasharray="${CIRC.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}" transform="rotate(-90 130 130)"
+      style="transition:stroke-dashoffset 0.9s linear,stroke 0.3s"/>
+    <text x="130" y="130" text-anchor="middle" dominant-baseline="middle" fill="white"
+      font-size="54" font-weight="200" font-family="-apple-system,sans-serif" letter-spacing="-2">${fmtT(S.timer.remain)}</text>
+  </svg>`;
+  const pb=document.getElementById('tc-play');if(pb)pb.innerHTML=ic(S.timer.running?'pause':'play',26,'#000');
+  [30,45,60,90,120,180].forEach(s=>{const b=document.getElementById('tp-'+s);
+    if(b){b.style.background=S.timer.total===s?col:C2;b.style.color=S.timer.total===s?'#000':T;}});
+}
+function rStrip(){
+  const col=S.timer.remain<=10?'#FF3B30':S.timer.remain<=30?'#FF9F0A':T;
+  const t=document.getElementById('ts-t');const p=document.getElementById('ts-p');
+  if(t){t.style.color=col;t.textContent=fmtT(S.timer.remain);}
+  if(p)p.innerHTML=ic(S.timer.running?'pause':'play',20,'#000');
 }
 
-function renderTimer(){
-  const bar=document.getElementById('timer-bar');if(!bar)return;
-  bar.style.display='block';
-  const pct=S.timerSec>0?(S.timerRemain/S.timerSec)*100:0;
-  const c=S.timerRemain<=10?'#FF3B30':S.timerRemain<=30?'#FF9F0A':col();
-  bar.innerHTML=`<div style="background:${CARD};border-top:0.5px solid ${BORDER};padding:10px 16px 14px">
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
-      <span style="font-size:13px;color:${T2}">Rest timer</span>
-      <div style="flex:1;height:3px;background:rgba(255,255,255,0.1);border-radius:2px;overflow:hidden">
-        <div style="width:${pct}%;height:100%;background:${c};transition:width 0.9s linear;border-radius:2px"></div>
-      </div>
-      <span style="font-size:20px;font-weight:600;min-width:44px;text-align:right;color:${c}">${fmt(S.timerRemain)}</span>
+// ── Workout ───────────────────────────────────────────────────────────────────
+function initWk(key){
+  const sess=allS()[key];if(!sess)return;
+  const setData={};
+  sess.exercises.forEach(ex=>{
+    setData[ex.id]=Array.from({length:ex.sets},()=>({weight:null,reps:null,note:'',done:false}));
+  });
+  S.wk={key,sessionName:sess.name,exercises:[...sess.exercises],setData,startTime:Date.now(),sessionNote:''};
+  S.timer.total=90;S.timer.remain=90;S.timer.running=false;S.timerStrip=false;S.wkMinimized=false;
+  if(S.timer.iv){clearInterval(S.timer.iv);S.timer.iv=null;}
+}
+function minimizeWk(){S.wkMinimized=true;S.screen='main';S.tab='log';render();}
+function resumeWk(){S.wkMinimized=false;S.screen='workout';render();}
+function endWkConfirm(){
+  showConfirm('End workout without saving?',()=>{
+    if(S.timer.iv)clearInterval(S.timer.iv);S.timer.iv=null;
+    S.timer.running=false;S.timerStrip=false;S.wk=null;S.wkMinimized=false;
+    S.screen='main';S.tab='routines';render();
+  });
+}
+
+async function finishWk(){
+  if(!S.wk)return;
+  const dur=Math.round((Date.now()-S.wk.startTime)/60000)||1;
+  const now=new Date();
+  const ps={};
+  S.wk.exercises.forEach(ex=>{
+    const f=(S.wk.setData[ex.id]||[]).filter(s=>s.done||(s.weight!=null)||(s.reps!=null));
+    if(f.length)ps[ex.id]=f.map(s=>({weight:s.weight,reps:s.reps,note:s.note||''}));
+  });
+  if(Object.keys(ps).length)S.prevSet[S.wk.key]={...(S.prevSet[S.wk.key]||{}),...ps};
+  const entry={
+    id:Date.now(),date:now,sessionKey:S.wk.key,
+    sessionName:allS()[S.wk.key]?.name||'Workout',
+    duration:dur,sessionNote:S.wk.sessionNote||'',
+    setData:JSON.parse(JSON.stringify(S.wk.setData)),
+    exercises:S.wk.exercises.map(e=>({id:e.id,name:e.name,target:e.sets+'×'+e.rep,w:e.w}))
+  };
+  S.history.unshift(entry);persist();
+  const p={...entry,date:entry.date.toISOString(),user:S.user};
+  apiPost('/save',p);apiPost('/commit',p);
+  if(S.timer.iv)clearInterval(S.timer.iv);S.timer.iv=null;
+  S.timer.running=false;S.timerStrip=false;S.wk=null;S.wkMinimized=false;
+  S.screen='main';S.tab='log';render();
+}
+
+// ── Workout set ops ───────────────────────────────────────────────────────────
+function removeHistory(idx){S.history.splice(idx,1);persist();render();}
+function toggleDone(exId,si){
+  if(!S.wk?.setData[exId])return;
+  S.wk.setData[exId][si].done=!S.wk.setData[exId][si].done;
+  const btn=document.getElementById('sc-'+exId+'-'+si);
+  if(btn){const d=S.wk.setData[exId][si].done;
+    btn.style.background=d?T:'none';btn.style.border=d?'none':'1.5px solid rgba(255,255,255,0.28)';
+    btn.style.color=d?'#000':'rgba(255,255,255,0.55)';}
+}
+const uw=(exId,si,v)=>{if(S.wk?.setData[exId])S.wk.setData[exId][si].weight=v===''?null:parseFloat(v)||null;};
+const ur=(exId,si,v)=>{if(S.wk?.setData[exId])S.wk.setData[exId][si].reps=v===''?null:parseInt(v)||null;};
+const un=(exId,si,v)=>{if(S.wk?.setData[exId])S.wk.setData[exId][si].note=v;};
+function addSet(exId){
+  if(!S.wk)return;const ex=S.wk.exercises.find(e=>e.id===exId);if(!ex)return;
+  const prev=S.wk.setData[exId]?.slice(-1)[0]||{weight:null,reps:null};
+  S.wk.setData[exId].push({weight:null,reps:null,note:'',done:false});
+  rerEx(exId);
+}
+function removeSet(exId,si){if(S.wk?.setData[exId]){S.wk.setData[exId].splice(si,1);S.menuSet=null;rerEx(exId);}}
+function dupSet(exId,si){if(S.wk?.setData[exId]){const s={...S.wk.setData[exId][si],done:false};S.wk.setData[exId].splice(si+1,0,s);S.menuSet=null;rerEx(exId);}}
+function removeExercise(exId){
+  if(!S.wk)return;
+  showConfirm('Remove this exercise?',()=>{S.wk.exercises=S.wk.exercises.filter(e=>e.id!==exId);delete S.wk.setData[exId];S.menuEx=null;render();});
+}
+function toggleMEx(exId){S.menuEx=S.menuEx===exId?null:exId;S.menuSet=null;rerEx(exId);}
+function toggleMSet(exId,si){const same=S.menuSet?.exId===exId&&S.menuSet?.si===si;S.menuSet=same?null:{exId,si};S.menuEx=null;rerEx(exId);}
+function showExHistory(exId,exName){
+  const hist=[];
+  S.history.forEach(h=>{
+    const ex=(h.exercises||[]).find(e=>e.id===exId||e.name===exName);
+    if(ex){const sets=(h.setData[ex.id]||[]).filter(s=>s.weight||s.reps);
+      if(sets.length)hist.push({date:h.date,sets});}
+  });
+  openSheet('exHist',{exName,hist:hist.slice(0,6)});
+}
+
+// ── Session management ────────────────────────────────────────────────────────
+function deleteSession(k){
+  if(BASE[k]){showAlert("Can't delete built-in sessions.");return;}
+  showConfirm('Delete session '+k+'?',()=>{delete S.customSessions[k];persist();render();});
+}
+function removeDetailEx(sk,exId){
+  showConfirm('Remove this exercise?',()=>{
+    if(!S.customSessions[sk])S.customSessions[sk]={...allS()[sk],exercises:[...allS()[sk].exercises]};
+    S.customSessions[sk].exercises=S.customSessions[sk].exercises.filter(e=>e.id!==exId);
+    persist();render();
+  });
+}
+function makeMutable(k){
+  if(!S.customSessions[k]){
+    const s=allS()[k];
+    S.customSessions[k]={...s,exercises:JSON.parse(JSON.stringify(s.exercises))};
+  }
+  return S.customSessions[k];
+}
+
+// ── Sheets ────────────────────────────────────────────────────────────────────
+function openSheet(type,data={}){S.sheet=type;S.sheetData={...data};renderSheet();}
+function closeSheet(){S.sheet=null;S.sheetData={};renderSheet();}
+
+function exFormFields(){
+  const d=S.sheetData;
+  return`<input type="text" placeholder="Exercise name" value="${(d.name||'').replace(/"/g,'&quot;')}" oninput="S.sheetData.name=this.value"
+    style="width:100%;background:${C2};border:none;border-radius:12px;padding:13px 14px;font-size:16px;color:white;margin-bottom:10px;outline:none"/>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+    <div><div style="font-size:12px;color:${T2};margin-bottom:6px">Sets</div>
+      <input type="number" value="${d.sets||3}" min="1" inputmode="numeric" oninput="S.sheetData.sets=+this.value"
+        style="width:100%;background:${C2};border:none;border-radius:12px;padding:13px 14px;font-size:16px;color:white;outline:none"/></div>
+    <div><div style="font-size:12px;color:${T2};margin-bottom:6px">Reps (e.g. 8-10)</div>
+      <input type="text" value="${(d.rep||'8').replace(/"/g,'&quot;')}" oninput="S.sheetData.rep=this.value"
+        style="width:100%;background:${C2};border:none;border-radius:12px;padding:13px 14px;font-size:16px;color:white;outline:none"/></div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+    <div><div style="font-size:12px;color:${T2};margin-bottom:6px">Rest time</div>
+      <input type="text" value="${(d.rest||'1 min').replace(/"/g,'&quot;')}" oninput="S.sheetData.rest=this.value"
+        style="width:100%;background:${C2};border:none;border-radius:12px;padding:13px 14px;font-size:16px;color:white;outline:none"/></div>
+    <div><div style="font-size:12px;color:${T2};margin-bottom:6px">Type</div>
+      <div onclick="S.sheetData.w=!S.sheetData.w;renderSheet()"
+        style="background:${C2};border-radius:12px;padding:13px 14px;font-size:14px;color:${d.w?T:T2};cursor:pointer">${d.w?'⚖ Weighted':'🔄 Bodyweight'}</div></div>
+  </div>
+  <div style="font-size:12px;color:${T2};margin-bottom:6px">Coaching note</div>
+  <input type="text" placeholder="E.g. neutral grip, controlled eccentric..." value="${(d.note||'').replace(/"/g,'&quot;')}" oninput="S.sheetData.note=this.value"
+    style="width:100%;background:${C2};border:none;border-radius:12px;padding:13px 14px;font-size:16px;color:white;outline:none"/>`;
+}
+
+function sheetHeader(title,saveFn,saveLabel='Save'){
+  return`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+    <button onclick="closeSheet()" style="background:none;border:none;color:${T2};cursor:pointer;font-size:16px">Cancel</button>
+    <span style="font-size:17px;font-weight:700">${title}</span>
+    <button onclick="${saveFn}" style="background:none;border:none;color:${T};cursor:pointer;font-size:16px;font-weight:600">${saveLabel}</button>
+  </div>`;
+}
+
+function renderSheet(){
+  const root=document.getElementById('sheet-root');if(!root)return;
+  if(!S.sheet){root.innerHTML='';return;}
+  const d=S.sheetData;
+  let c='';
+
+  if(S.sheet==='addSess'){c=sheetHeader('New Session','saveSession()')+`
+    <div style="font-size:12px;color:${T2};margin-bottom:6px">Letter</div>
+    <input type="text" value="${d.key||''}" maxlength="3" oninput="S.sheetData.key=this.value.toUpperCase()" autocapitalize="characters"
+      style="width:100%;background:${C2};border:none;border-radius:12px;padding:13px 14px;font-size:16px;color:white;margin-bottom:10px;outline:none"/>
+    <div style="font-size:12px;color:${T2};margin-bottom:6px">Session name</div>
+    <input type="text" placeholder="e.g. Legs — Heavy" value="${(d.name||'').replace(/"/g,'&quot;')}" oninput="S.sheetData.name=this.value"
+      style="width:100%;background:${C2};border:none;border-radius:12px;padding:13px 14px;font-size:16px;color:white;outline:none"/>`;}
+
+  else if(S.sheet==='editSess'){c=sheetHeader('Edit Session','saveSessionMeta()')+`
+    <div style="font-size:12px;color:${T2};margin-bottom:6px">Session name</div>
+    <input type="text" value="${(d.name||'').replace(/"/g,'&quot;')}" oninput="S.sheetData.name=this.value"
+      style="width:100%;background:${C2};border:none;border-radius:12px;padding:13px 14px;font-size:16px;color:white;margin-bottom:10px;outline:none"/>
+    <div style="font-size:12px;color:${T2};margin-bottom:6px">Session notes</div>
+    <textarea placeholder="Notes about this session (goals, context, reminders...)" oninput="S.sheetData.notes=this.value"
+      style="width:100%;background:${C2};border:none;border-radius:12px;padding:13px 14px;font-size:16px;color:white;outline:none;resize:none;height:100px;line-height:1.4">${d.notes||''}</textarea>`;}
+
+  else if(S.sheet==='addExDetail'||S.sheet==='editExDetail'){
+    const isEdit=S.sheet==='editExDetail';
+    c=sheetHeader(isEdit?'Edit Exercise':'Add Exercise',isEdit?'saveEditEx()':'saveAddEx()')+exFormFields();}
+
+  else if(S.sheet==='addExWkt'){c=sheetHeader('Add Exercise','saveAddExWkt()')+exFormFields();}
+
+  else if(S.sheet==='wktNote'){c=sheetHeader('Session Note','saveWktNote()')+`
+    <textarea placeholder="How are you feeling? Any pain, injury notes, context..." oninput="S.sheetData.note=this.value"
+      style="width:100%;background:${C2};border:none;border-radius:12px;padding:13px 14px;font-size:16px;color:white;outline:none;resize:none;height:120px;line-height:1.4">${d.note||''}</textarea>`;}
+
+  else if(S.sheet==='changePwd'){c=sheetHeader('Change Password','doChangePwd()')+`
+    ${d.err?`<div style="background:rgba(255,59,48,0.12);border:0.5px solid rgba(255,59,48,0.3);border-radius:10px;padding:11px 14px;color:#FF3B30;font-size:14px;margin-bottom:10px">${d.err}</div>`:''}
+    <input type="password" placeholder="Current password" oninput="S.sheetData.cur=this.value"
+      style="width:100%;background:${C2};border:none;border-radius:12px;padding:13px 14px;font-size:16px;color:white;margin-bottom:10px;outline:none"/>
+    <input type="password" placeholder="New password" oninput="S.sheetData.nw=this.value"
+      style="width:100%;background:${C2};border:none;border-radius:12px;padding:13px 14px;font-size:16px;color:white;margin-bottom:10px;outline:none"/>
+    <input type="password" placeholder="Confirm new password" oninput="S.sheetData.cf=this.value"
+      style="width:100%;background:${C2};border:none;border-radius:12px;padding:13px 14px;font-size:16px;color:white;outline:none"/>`;}
+
+  else if(S.sheet==='changeUser'){c=sheetHeader('Change Display Name','doChangeUser()')+`
+    <div style="font-size:13px;color:${T2};margin-bottom:14px;line-height:1.5">This changes how your name is displayed. Your login credentials stay the same.</div>
+    <input type="text" placeholder="Display name" value="${displayName().replace(/"/g,'&quot;')}" oninput="S.sheetData.alias=this.value"
+      style="width:100%;background:${C2};border:none;border-radius:12px;padding:13px 14px;font-size:16px;color:white;outline:none"/>`;}
+
+  else if(S.sheet==='exHist'){
+    const hist=d.hist||[];
+    c=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <span style="font-size:17px;font-weight:700">${d.exName}</span>
+      <button onclick="closeSheet()" style="background:none;border:none;color:${T2};cursor:pointer">${ic('x',20)}</button>
     </div>
-    <div style="display:flex;gap:8px;align-items:center">
-      ${[60,90,120,180].map(s=>`<button onclick="timerReset(${s})" style="flex:1;padding:7px 0;border-radius:8px;border:none;background:${S.timerSec===s?c+'30':'rgba(255,255,255,0.07)'};color:${S.timerSec===s?c:'rgba(255,255,255,0.55)'};font-size:12px;font-weight:500;cursor:pointer">${s<60?s+'s':Math.floor(s/60)+'m'}</button>`).join('')}
-      <button onclick="${S.timerRunning?'timerPause()':'timerStart()'}" style="flex:1;padding:7px 0;border-radius:8px;border:none;background:${c};color:white;font-size:13px;font-weight:600;cursor:pointer">${S.timerRunning?'Pause':'Start'}</button>
-      <button onclick="timerReset()" style="width:34px;height:34px;flex-shrink:0;border-radius:8px;border:none;background:rgba(255,255,255,0.07);color:rgba(255,255,255,0.5);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center"><i class="ti ti-refresh"></i></button>
+    ${hist.length===0?`<div style="text-align:center;color:${T2};padding:30px 0">No history yet for this exercise</div>`:
+    hist.map(h=>`<div style="margin-bottom:14px">
+      <div style="font-size:12px;color:${T2};margin-bottom:6px">${h.date.toLocaleDateString('nl-BE',{day:'numeric',month:'short',year:'numeric'})}</div>
+      ${h.sets.map((s,i)=>`<div style="display:flex;gap:16px;padding:7px 0;border-bottom:0.5px solid ${DIV}">
+        <span style="font-size:13px;color:${T2}">Set ${i+1}</span>
+        ${s.weight?`<span style="font-size:14px;font-weight:600">${s.weight}kg</span>`:''}
+        <span style="font-size:14px;font-weight:600">${s.reps||'—'} reps</span>
+        ${s.note?`<span style="font-size:13px;color:${T2};flex:1">${s.note}</span>`:''}
+      </div>`).join('')}
+    </div>`).join('')}`;}
+
+  root.innerHTML=`<div class="sheet" onclick="if(event.target===this)closeSheet()"><div class="sheet-inner">${c}</div></div>`;
+}
+
+function saveSession(){
+  const d=S.sheetData;if(!d.name?.trim()){showAlert('Enter a session name.');return;}
+  const k=(d.key||nextKey()).toUpperCase().slice(0,3);
+  S.customSessions[k]={name:d.name.trim(),notes:'',exercises:[]};persist();closeSheet();
+  S.activeKey=k;S.screen='detail';render();
+}
+function saveSessionMeta(){
+  const d=S.sheetData;if(!d.name?.trim())return;
+  const s=makeMutable(d.key);s.name=d.name.trim();s.notes=d.notes||'';persist();closeSheet();render();
+}
+function saveAddEx(){
+  const d=S.sheetData;if(!d.name?.trim()){showAlert('Enter an exercise name.');return;}
+  const s=makeMutable(d.sessionKey);
+  s.exercises.push({id:genId(),name:d.name.trim(),sets:+d.sets||3,rep:d.rep||'8',rest:d.rest||'1 min',note:d.note||'',w:!!d.w});
+  persist();closeSheet();render();
+}
+function saveEditEx(){
+  const d=S.sheetData;if(!d.name?.trim())return;
+  const s=makeMutable(d.sessKey);
+  const idx=s.exercises.findIndex(e=>e.id===d.exId);
+  if(idx>=0)s.exercises[idx]={id:d.exId,name:d.name.trim(),sets:+d.sets||3,rep:d.rep||'8',rest:d.rest||'1 min',note:d.note||'',w:!!d.w};
+  persist();closeSheet();render();
+}
+function saveAddExWkt(){
+  const d=S.sheetData;if(!d.name?.trim()||!S.wk){showAlert('Enter a name.');return;}
+  const id=genId();const ex={id,name:d.name.trim(),sets:+d.sets||3,rep:d.rep||'8',rest:d.rest||'1 min',note:d.note||'',w:!!d.w};
+  S.wk.exercises.push(ex);
+  S.wk.setData[id]=Array.from({length:ex.sets},()=>({weight:null,reps:null,note:'',done:false}));
+  closeSheet();render();
+}
+function saveWktNote(){S.wk.sessionNote=S.sheetData.note||'';closeSheet();}
+function doChangePwd(){
+  const d=S.sheetData;
+  if(!checkPwd(S.user,d.cur||'')){S.sheetData.err='Wrong current password';renderSheet();return;}
+  if(!d.nw||d.nw.length<4){S.sheetData.err='New password must be at least 4 characters';renderSheet();return;}
+  if(d.nw!==d.cf){S.sheetData.err='Passwords do not match';renderSheet();return;}
+  setPwd(S.user,d.nw);closeSheet();showAlert('Password changed successfully!');
+}
+function doChangeUser(){
+  const d=S.sheetData;if(!d.alias?.trim())return;
+  setAlias(S.user,d.alias.trim());closeSheet();render();
+}
+
+// ── Re-render helpers ─────────────────────────────────────────────────────────
+function rerEx(exId){
+  const el=document.getElementById('ex-'+exId);if(!el){render();return;}
+  const ex=S.wk?.exercises.find(e=>e.id===exId);if(!ex){render();return;}
+  const tmp=document.createElement('div');tmp.innerHTML=buildEx(ex);el.replaceWith(tmp.firstChild);wireEx(exId);
+}
+function wireEx(exId){
+  document.querySelectorAll('[data-w="'+exId+'"]').forEach(i=>{const si=+i.dataset.si;i.oninput=()=>uw(exId,si,i.value);});
+  document.querySelectorAll('[data-r="'+exId+'"]').forEach(i=>{const si=+i.dataset.si;i.oninput=()=>ur(exId,si,i.value);});
+  document.querySelectorAll('[data-n="'+exId+'"]').forEach(i=>{const si=+i.dataset.si;i.oninput=()=>un(exId,si,i.value);});
+}
+function wireAll(){if(S.wk)S.wk.exercises.forEach(ex=>wireEx(ex.id));}
+
+// ── Exercise card ─────────────────────────────────────────────────────────────
+function buildEx(ex){
+  const sets=S.wk.setData[ex.id]||[];
+  const mEx=S.menuEx===ex.id;
+  const cols='40px '+(ex.w?'80px ':'' )+'1fr 90px 36px';
+  return`<div id="ex-${ex.id}" style="background:${C1};border-radius:16px;margin:0 0 12px;position:relative">
+    <div style="padding:14px 16px 10px;display:flex;align-items:flex-start;justify-content:space-between">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:17px;font-weight:700;margin-bottom:2px">${ex.name}</div>
+        <div style="font-size:13px;color:${T2};line-height:1.8">${ex.rest}</div>
+        <div style="font-size:13px;color:${T2}">----</div>
+        <div style="font-size:13px;color:${T2}">Reps: ${ex.rep}</div>
+        ${ex.note?`<div style="font-size:13px;color:${T2}">Note: ${ex.note}</div>`:''}
+      </div>
+      <button onclick="toggleMEx('${ex.id}')" style="background:none;border:none;color:${T2};cursor:pointer;padding:4px">${ic('dots',22,T2)}</button>
+    </div>
+    ${mEx?`<div style="position:absolute;right:8px;top:38px;background:${C2};border-radius:14px;overflow:hidden;z-index:20;min-width:190px;box-shadow:0 8px 32px rgba(0,0,0,0.6)">
+      <button onclick="removeExercise('${ex.id}')" style="display:block;width:100%;padding:14px 16px;background:none;border:none;border-bottom:0.5px solid ${DIV};color:#FF3B30;cursor:pointer;text-align:left;font-size:15px">Remove exercise</button>
+      <button onclick="S.menuEx=null;rerEx('${ex.id}')" style="display:block;width:100%;padding:14px 16px;background:none;border:none;color:${T2};cursor:pointer;text-align:left;font-size:15px">Cancel</button>
+    </div>`:''}
+    <div style="height:0.5px;background:${DIV}"></div>
+    <div style="display:grid;grid-template-columns:${cols};padding:7px 16px;border-bottom:0.5px solid ${DIV}">
+      <span></span>
+      ${ex.w?`<span style="font-size:13px;color:${T2}">+Weight</span>`:''}
+      <span style="font-size:13px;color:${T2}">Reps</span>
+      <span style="font-size:13px;color:${T2}">Notes</span>
+      <span></span>
+    </div>
+    ${sets.map((st,si)=>{
+      const pvsi=pv(S.wk.key,ex.id)[si];
+      const mS=S.menuSet?.exId===ex.id&&S.menuSet?.si===si;
+      return`<div style="border-bottom:0.5px solid ${DIV};position:relative">
+        <div style="display:grid;grid-template-columns:${cols};padding:13px 16px;align-items:center;background:${st.done?T+'12':'transparent'}">
+          <button id="sc-${ex.id}-${si}" onclick="toggleDone('${ex.id}',${si})"
+            style="width:30px;height:30px;border-radius:50%;border:${st.done?'none':'1.5px solid rgba(255,255,255,0.28)'};background:${st.done?T:'none'};color:${st.done?'#000':'rgba(255,255,255,0.55)'};font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center">${si+1}</button>
+          ${ex.w?`<input data-w="${ex.id}" data-si="${si}" type="number" value="${st.weight??''}" placeholder="${pvsi?.weight??'—'}" step="0.5" inputmode="decimal" style="background:none;border:none;color:white;font-size:17px;width:72px;outline:none;padding:0;">`:''}
+          <input data-r="${ex.id}" data-si="${si}" type="number" value="${st.reps??''}" placeholder="${pvsi?.reps??(parseInt(ex.rep)||'—')}" inputmode="numeric" style="background:none;border:none;color:white;font-size:17px;width:60px;outline:none;padding:0;"/>
+          <input data-n="${ex.id}" data-si="${si}" type="text" value="${(st.note||'').replace(/"/g,'&quot;')}" placeholder="${pvsi?.note?pvsi.note.slice(0,20)+'…':''}" style="background:none;border:none;color:${T2};font-size:14px;width:100%;outline:none;padding:0;"/>
+          <button onclick="toggleMSet('${ex.id}',${si})" style="background:none;border:none;color:${T2};cursor:pointer;display:flex;align-items:center;justify-content:flex-end">${ic('dots',20,T2)}</button>
+        </div>
+        ${mS?`<div style="position:absolute;right:8px;top:40px;background:${C2};border-radius:14px;overflow:hidden;z-index:20;min-width:170px;box-shadow:0 8px 32px rgba(0,0,0,0.6)">
+          <button onclick="dupSet('${ex.id}',${si})" style="display:block;width:100%;padding:14px 16px;background:none;border:none;border-bottom:0.5px solid ${DIV};color:white;cursor:pointer;text-align:left;font-size:15px">Duplicate set</button>
+          <button onclick="removeSet('${ex.id}',${si})" style="display:block;width:100%;padding:14px 16px;background:none;border:none;color:#FF3B30;cursor:pointer;text-align:left;font-size:15px">Remove set</button>
+        </div>`:''}
+      </div>`;
+    }).join('')}
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:13px 16px">
+      <button onclick="addSet('${ex.id}')" style="display:flex;align-items:center;gap:8px;background:none;border:none;color:${T};font-size:15px;font-weight:600;cursor:pointer">
+        <svg width="22" height="22" viewBox="0 0 22 22"><circle cx="11" cy="11" r="10" fill="none" stroke="${T}" stroke-width="1.6"/><path d="M11 7v8M7 11h8" stroke="${T}" stroke-width="1.6" stroke-linecap="round"/></svg>
+        Add Set
+      </button>
+      <button onclick="showExHistory('${ex.id}','${ex.name.replace(/'/g,"\\'")}');event.stopPropagation()"
+        style="display:flex;align-items:center;gap:6px;background:none;border:none;color:${T2};cursor:pointer;font-size:13px">
+        ${ic('history',18,T2)} History
+      </button>
     </div>
   </div>`;
 }
 
-function render(){
-  const main=document.getElementById('main');
-  main.innerHTML=renderScreen();
-  main.className='page';
-  // Wire up live inputs
-  main.querySelectorAll('input[data-w]').forEach(i=>{const[e,s]=i.dataset.w.split(',');i.oninput=()=>updateW(e,+s,i.value);});
-  main.querySelectorAll('input[data-r]').forEach(i=>{const[e,s]=i.dataset.r.split(',');i.oninput=()=>updateR(e,+s,i.value);});
-  main.querySelectorAll('textarea[data-n]').forEach(t=>{const[e,s]=t.dataset.n.split(',');t.oninput=()=>updateNote(e,+s,t.value);});
-  const bar=document.getElementById('timer-bar');
-  if(S.screen==='workout'){renderTimer();}
-  else{bar.style.display='none';if(S.timerInterval){clearInterval(S.timerInterval);S.timerInterval=null;S.timerRunning=false;}}
+// ── Bottom UI (fixed) ─────────────────────────────────────────────────────────
+function renderBottomUI(){
+  const el=document.getElementById('bottom-ui');if(!el)return;
+  if(S.screen==='timer'){el.innerHTML='';return;}
+
+  let strips='';
+  // Resume workout strip (when minimized)
+  if(S.wk&&S.wkMinimized){
+    strips+=`<div style="padding:8px 16px 0">
+      <div onclick="resumeWk()" style="background:${C1};border-radius:14px;padding:12px 14px;display:flex;align-items:center;gap:12px;cursor:pointer;border:0.5px solid rgba(77,217,212,0.25);box-shadow:0 4px 20px rgba(0,0,0,0.4)">
+        <div style="width:38px;height:38px;border-radius:50%;background:${T};display:flex;align-items:center;justify-content:center;flex-shrink:0">${ic('play',16,'#000')}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:12px;color:${T2}">Workout in progress</div>
+          <div style="font-size:15px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${S.wk.sessionName}</div>
+        </div>
+        <button onclick="event.stopPropagation();endWkConfirm()" style="background:rgba(255,59,48,0.15);border:0.5px solid rgba(255,59,48,0.3);border-radius:10px;color:#FF3B30;font-size:13px;font-weight:600;padding:7px 12px;cursor:pointer">End</button>
+      </div>
+    </div>`;
+  }
+  // Timer strip (when workout active and timer shown)
+  if(S.wk&&!S.wkMinimized&&S.screen==='workout'&&S.timerStrip){
+    const col=S.timer.remain<=10?'#FF3B30':S.timer.remain<=30?'#FF9F0A':T;
+    strips+=`<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;background:rgba(0,0,0,0.95);border-top:0.5px solid ${DIV}">
+      <button id="ts-p" onclick="${S.timer.running?'timerPause()':'timerStart()'}"
+        style="width:46px;height:46px;border-radius:50%;background:${T};border:none;cursor:pointer;display:flex;align-items:center;justify-content:center">${ic(S.timer.running?'pause':'play',20,'#000')}</button>
+      <button id="ts-t" onclick="openTimer()"
+        style="background:none;border:none;cursor:pointer;font-size:32px;font-weight:300;color:${col};letter-spacing:-1px">${fmtT(S.timer.remain)}</button>
+      <button onclick="hideStrip()"
+        style="width:46px;height:46px;border-radius:50%;background:${C1};border:none;color:white;cursor:pointer;display:flex;align-items:center;justify-content:center">${ic('x',18)}</button>
+    </div>`;
+  }
+  // Tab bar (main screens and minimized workout)
+  if(S.screen==='main'||(S.wk&&S.wkMinimized)){
+    const tabs=[{id:'log',label:'Log',icon:'log'},{id:'routines',label:'Routines',icon:'list'},{id:'stats',label:'Statistics',icon:'chart'},{id:'profile',label:'Profile',icon:'user'}];
+    strips+=`<div style="background:${C1};border-top:0.5px solid ${DIV};display:flex;padding:4px 0 ${BOT}">
+      ${tabs.map(tab=>`<button onclick="S.tab='${tab.id}';S.editMode=false;render()" style="flex:1;background:none;border:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;padding:4px 0">
+        <div style="width:56px;height:36px;border-radius:18px;background:${S.tab===tab.id?C2:'transparent'};display:flex;align-items:center;justify-content:center">
+          ${ic(tab.icon,23,S.tab===tab.id?T:'rgba(255,255,255,0.4)')}
+        </div>
+        <span style="font-size:10px;font-weight:500;color:${S.tab===tab.id?T:'rgba(255,255,255,0.4)'}">${tab.label}</span>
+      </button>`).join('')}
+    </div>`;
+  }
+  el.innerHTML=strips;
 }
 
+// ── Main render ───────────────────────────────────────────────────────────────
+function render(){
+  if(S.screen==='timer'){
+    document.getElementById('scroll').innerHTML=screenTimer();
+    document.getElementById('scroll').style.paddingBottom='0';
+    renderBottomUI();rCircle();return;
+  }
+  document.getElementById('scroll').className='anim';
+  document.getElementById('scroll').innerHTML=renderScreen();
+  // Padding for bottom UI
+  let pb=0;
+  if(S.wk&&S.wkMinimized)pb+=80; // resume strip
+  if(S.screen==='workout'&&S.timerStrip)pb+=76; // timer strip
+  if(S.screen==='main'||(S.wk&&S.wkMinimized))pb+=66; // tab bar
+  document.getElementById('scroll').style.paddingBottom=pb+'px';
+  renderBottomUI();wireAll();
+}
 function renderScreen(){
-  if(S.screen==='login')return renderLogin();
-  if(S.screen==='home')return renderHome();
-  if(S.screen==='workout')return renderWorkout();
-  if(S.screen==='complete')return renderComplete();
-  if(S.screen==='history')return renderHistory();
+  if(S.screen==='login')return screenLogin();
+  if(S.screen==='main'){
+    if(S.tab==='log')return screenLog();
+    if(S.tab==='routines')return screenRoutines();
+    if(S.tab==='stats')return screenStats();
+    if(S.tab==='profile')return screenProfile();
+  }
+  if(S.screen==='detail')return screenDetail();
+  if(S.screen==='workout')return screenWorkout();
+  if(S.screen==='log-detail')return screenLogDetail();
   return '';
 }
 
-function renderLogin(){return`
-  <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px 28px 40px;min-height:100dvh;">
-    <div style="width:80px;height:80px;border-radius:22px;background:#5E5CE6;display:flex;align-items:center;justify-content:center;margin-bottom:20px;box-shadow:0 8px 32px rgba(94,92,230,0.4)">
-      <i class="ti ti-barbell" style="font-size:40px;color:white"></i>
-    </div>
-    <h1 style="font-size:28px;font-weight:700;margin-bottom:6px">Gym</h1>
-    <p style="color:${T2};font-size:14px;margin-bottom:48px">sdckx.be</p>
-    ${S.loginErr?`<div style="background:rgba(255,59,48,0.15);border:0.5px solid rgba(255,59,48,0.3);border-radius:12px;padding:12px 16px;color:#FF3B30;font-size:13px;width:100%;margin-bottom:16px;text-align:center">Wrong username or password</div>`:''}
-    <input id="lu" type="text" placeholder="Username" autocomplete="username" value="${S.loginU}" oninput="S.loginU=this.value" onkeydown="if(event.key==='Enter')document.getElementById('lp').focus()" style="width:100%;background:${CARD};border:0.5px solid ${BORDER};border-radius:14px;padding:15px 16px;font-size:16px;color:white;margin-bottom:10px;outline:none;"/>
-    <input id="lp" type="password" placeholder="Password" autocomplete="current-password" value="${S.loginP}" oninput="S.loginP=this.value" onkeydown="if(event.key==='Enter')doLogin()" style="width:100%;background:${CARD};border:0.5px solid ${BORDER};border-radius:14px;padding:15px 16px;font-size:16px;color:white;margin-bottom:24px;outline:none;"/>
-    <button onclick="doLogin()" style="width:100%;padding:16px;border-radius:14px;background:#5E5CE6;color:white;border:none;font-size:17px;font-weight:600;cursor:pointer;">Sign in</button>
-  </div>`;}
+// ── Screens ───────────────────────────────────────────────────────────────────
+function rb(onclick,content,extra=''){
+  return`<button onclick="${onclick}" style="width:38px;height:38px;border-radius:50%;background:${C1};border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;${extra}">${content}</button>`;
+}
+
+function screenLogin(){return`
+<div style="display:flex;flex-direction:column;align-items:center;padding:${TOP} 24px 40px;min-height:100dvh;justify-content:center">
+  <div style="width:80px;height:80px;border-radius:22px;background:${C1};display:flex;align-items:center;justify-content:center;margin-bottom:18px">
+    <svg width="42" height="42" viewBox="0 0 42 42" fill="none">
+      <path d="M4 21H10L14 11L21 33L25 18L29 24H38" stroke="${T}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </div>
+  <div style="font-size:27px;font-weight:700;margin-bottom:4px">Gym</div>
+  <div style="font-size:14px;color:${T2};margin-bottom:44px">sdckx.be</div>
+  ${S.loginErr?`<div style="background:rgba(255,59,48,0.12);border:0.5px solid rgba(255,59,48,0.3);border-radius:12px;padding:12px 16px;color:#FF3B30;font-size:14px;width:100%;text-align:center;margin-bottom:14px">Wrong username or password</div>`:''}
+  <input type="text" placeholder="Username" autocomplete="username" value="${S.loginU}" oninput="S.loginU=this.value" onkeydown="if(event.key==='Enter')document.getElementById('lp').focus()"
+    style="width:100%;background:${C1};border:0.5px solid ${T3};border-radius:14px;padding:15px 16px;font-size:16px;color:white;margin-bottom:10px;outline:none"/>
+  <input id="lp" type="password" placeholder="Password" autocomplete="current-password" value="${S.loginP}" oninput="S.loginP=this.value" onkeydown="if(event.key==='Enter')doLogin()"
+    style="width:100%;background:${C1};border:0.5px solid ${T3};border-radius:14px;padding:15px 16px;font-size:16px;color:white;margin-bottom:22px;outline:none"/>
+  <button onclick="doLogin()" style="width:100%;padding:16px;border-radius:14px;background:${T};color:#000;border:none;font-size:17px;font-weight:700;cursor:pointer">Sign in</button>
+</div>`;}
 
 function doLogin(){
-  if(typeof USERS!=='undefined'&&USERS[S.loginU.toLowerCase()]===S.loginP){
-    S.user=S.loginU.toLowerCase();S.loginErr=false;
-    fetchHistory().then(()=>{S.screen='home';render();});
+  const rawU=S.loginU.toLowerCase();const u=getLoginKey(rawU);
+  if(checkPwd(u,S.loginP)){
+    S.user=u;S.loginErr=false;load();S.screen='main';S.tab='routines';render();
   }else{S.loginErr=true;render();}
 }
 
-function renderHome(){
-  const today=new Date().toLocaleDateString('nl-BE',{weekday:'long',day:'numeric',month:'long'});
-  const s=sess();
-  return`<div style="padding:env(safe-area-inset-top,20px) 16px 0;padding-top:max(env(safe-area-inset-top),20px)">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
-      <h1 style="font-size:30px;font-weight:700">Gym</h1>
-      <span style="color:${T2};font-size:13px">${S.user}</span>
+function screenRoutines(){
+  const keys=Object.keys(allS());
+  return`<div style="padding:${TOP} 16px 20px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:22px">
+      ${rb("S.editMode=!S.editMode;render()",'<span style="font-size:14px;font-weight:500">'+(S.editMode?'Done':'Edit')+'</span>','min-width:60px;width:auto;padding:0 14px;border-radius:22px;')}
+      <div style="font-size:34px;font-weight:800">Routines</div>
+      ${rb("openSheet('addSess',{key:nextKey()})",ic('plus',22,T))}
     </div>
-    <p style="color:${T2};font-size:14px;margin-bottom:28px">${today}</p>
-    <p style="font-size:11px;font-weight:600;color:${T2};text-transform:uppercase;letter-spacing:0.8px;margin-bottom:12px">Sessions</p>
-    ${Object.entries(s).map(([k,s])=>{
-      const last=S.history.find(h=>h.sessionKey===k);
-      const lastDate=last?new Date(last.date).toLocaleDateString('nl-BE',{day:'numeric',month:'short'}):'Never done';
-      return`<div onclick="startSession('${k}')" style="display:flex;align-items:center;gap:14px;background:${CARD};border:0.5px solid ${BORDER};border-radius:18px;padding:15px 16px;margin-bottom:10px;cursor:pointer;-webkit-tap-highlight-color:transparent;active:background:#2C2C2E">
-        <div style="width:48px;height:48px;border-radius:14px;background:${COLORS[k]||'#5E5CE6'}20;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:${COLORS[k]||'#5E5CE6'};flex-shrink:0">${k}</div>
-        <div style="flex:1;min-width:0">
-          <div style="font-weight:600;font-size:16px">${s.name}</div>
-          <div style="font-size:12px;color:${T2};margin-top:2px">${s.exercises.length} exercises · ${lastDate}</div>
+    <div style="background:${C1};border-radius:16px;overflow:hidden">
+      ${keys.length===0?`<div style="padding:24px;text-align:center;color:${T2}">Tap + to create your first session</div>`:''}
+      ${keys.map((k,i)=>`
+        <div style="display:flex;align-items:center;border-bottom:${i<keys.length-1?'0.5px solid '+DIV:'none'}">
+          ${S.editMode?`<button onclick="deleteSession('${k}')" style="background:none;border:none;padding:0 14px;cursor:pointer;color:#FF3B30;font-size:26px;flex-shrink:0">−</button>`:''}
+          <div onclick="${S.editMode?'':'S.activeKey=\''+k+'\';S.screen=\'detail\';render()'}" style="flex:1;display:flex;align-items:center;justify-content:space-between;padding:16px ${S.editMode?'10px 16px':'16px'};cursor:pointer">
+            <span style="font-size:16px">Session ${k}: ${allS()[k].name}</span>
+            ${ic('cr',16,'rgba(255,255,255,0.28)')}
+          </div>
+        </div>`).join('')}
+    </div>
+  </div>`;}
+
+function screenLog(){
+  if(S.history.length===0)return`<div style="padding:${TOP} 16px">
+    <div style="font-size:34px;font-weight:800;margin-bottom:40px">Log</div>
+    <div style="text-align:center;color:${T2};padding:80px 0">
+      ${ic('log',52,T2)}<div style="font-size:17px;font-weight:600;margin-top:16px">No workouts yet</div>
+      <div style="font-size:14px;margin-top:6px">Start a routine to see your log</div>
+    </div>
+  </div>`;
+  const groups={};
+  S.history.forEach((h,idx)=>{const k=h.date.toLocaleString('en-US',{month:'long',year:'numeric'});if(!groups[k])groups[k]=[];groups[k].push({...h,_i:idx});});
+  return`<div style="padding:${TOP} 16px 20px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:22px">
+      ${rb("S.editMode=!S.editMode;render()",'<span style="font-size:14px;font-weight:500">'+(S.editMode?'Done':'Edit')+'</span>','min-width:60px;width:auto;padding:0 14px;border-radius:22px;')}
+      <div style="font-size:34px;font-weight:800">Log</div>
+      <div style="width:60px"></div>
+    </div>
+    ${Object.entries(groups).map(([month,entries])=>`
+      <div style="display:flex;justify-content:space-between;margin:20px 0 8px">
+        <span style="font-size:14px;font-weight:600;color:${T2}">${month}</span>
+        <span style="font-size:14px;font-weight:600;color:${T2}">${entries.length} Workout${entries.length!==1?'s':''}</span>
+      </div>
+      <div style="background:${C1};border-radius:16px;overflow:hidden">
+        ${entries.map((h,ei)=>{
+          const dayA=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][h.date.getDay()];
+          const exDone=(h.exercises||[]).filter(e=>(h.setData[e.id]||[]).length>0);
+          return`<div onclick="${S.editMode?'':'S.logDetail=S.history['+h._i+'];S.screen=\'log-detail\';render()'}"
+            style="display:flex;align-items:flex-start;padding:14px 16px;border-bottom:${ei<entries.length-1?'0.5px solid '+DIV:'none'};cursor:pointer">
+            ${S.editMode?`<button onclick="event.stopPropagation();removeHistory(${h._i})" style="background:none;border:none;padding:0 10px 0 0;cursor:pointer;color:#FF3B30;font-size:26px;flex-shrink:0;align-self:center">−</button>`:''}
+            <div style="background:${C2};border-radius:9px;padding:6px 10px;min-width:46px;text-align:center;margin-right:14px;flex-shrink:0">
+              <div style="font-size:11px;font-weight:600;color:${T2}">${dayA}</div>
+              <div style="font-size:22px;font-weight:700;line-height:1.1">${h.date.getDate()}</div>
+            </div>
+            <div style="flex:1;min-width:0">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px">
+                <div style="font-size:16px;font-weight:700;padding-right:8px">${h.sessionName}</div>
+                <span style="font-size:14px;color:${T2};flex-shrink:0">${h.duration} min</span>
+              </div>
+              ${exDone.slice(0,5).map(e=>`<div style="font-size:14px;color:${T2};line-height:1.65">${(h.setData[e.id]||[]).length}x ${e.name}</div>`).join('')}
+              ${exDone.length>5?`<div style="font-size:12px;color:${T2};margin-top:2px">+${exDone.length-5} more</div>`:''}
+              ${h.sessionNote?`<div style="font-size:12px;color:${T};margin-top:4px;font-style:italic">${ic('note',12,T)} ${h.sessionNote}</div>`:''}
+            </div>
+          </div>`;
+        }).join('')}
+      </div>`).join('')}
+  </div>`;}
+
+function screenLogDetail(){
+  const h=S.logDetail;if(!h)return '';
+  const da=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][h.date.getDay()];
+  const ds=h.date.toLocaleDateString('nl-BE',{day:'numeric',month:'long',year:'numeric'});
+  const exDone=(h.exercises||[]).filter(e=>(h.setData[e.id]||[]).length>0);
+  return`<div>
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:${TOP} 16px 16px">
+      ${rb("S.screen='main';S.tab='log';render()",ic('back',18))}
+      ${rb("initWk('"+h.sessionKey+"');S.screen='workout';render()",'<span style="font-size:12px;font-weight:600;color:'+T+'">Redo</span>','width:auto;padding:0 14px;border-radius:22px;')}
+    </div>
+    <div style="padding:0 16px 24px">
+      <div style="font-size:28px;font-weight:800;margin-bottom:4px">${h.sessionName}</div>
+      <div style="font-size:14px;color:${T2};margin-bottom:${h.sessionNote?'10px':'24px'}">${da} ${ds} · ${h.duration} min</div>
+      ${h.sessionNote?`<div style="background:${C1};border-radius:12px;padding:12px 14px;margin-bottom:20px;font-size:14px;color:${T2};font-style:italic">${ic('note',15,T2)} ${h.sessionNote}</div>`:''}
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:24px">
+        ${[{l:'Duration',v:h.duration+'m'},{l:'Exercises',v:exDone.length},{l:'Total sets',v:Object.values(h.setData||{}).flat().length}].map(s=>`
+          <div style="background:${C1};border-radius:12px;padding:14px 8px;text-align:center">
+            <div style="font-size:22px;font-weight:700">${s.v}</div>
+            <div style="font-size:11px;color:${T2};margin-top:3px">${s.l}</div>
+          </div>`).join('')}
+      </div>
+      ${exDone.map(e=>{
+        const sets=h.setData[e.id]||[];
+        return`<div style="background:${C1};border-radius:14px;margin-bottom:10px;overflow:hidden">
+          <div style="padding:12px 16px;border-bottom:0.5px solid ${DIV};font-size:16px;font-weight:700">${e.name}</div>
+          <div style="display:grid;grid-template-columns:30px ${e.w?'80px ':'' }60px 1fr;padding:7px 16px;border-bottom:0.5px solid ${DIV}">
+            <span style="font-size:12px;color:${T2}">Set</span>
+            ${e.w?`<span style="font-size:12px;color:${T2}">Weight</span>`:''}
+            <span style="font-size:12px;color:${T2}">Reps</span>
+            <span style="font-size:12px;color:${T2}">Notes</span>
+          </div>
+          ${sets.map((s,si)=>`<div style="display:grid;grid-template-columns:30px ${e.w?'80px ':'' }60px 1fr;padding:11px 16px;border-bottom:0.5px solid ${DIV};background:${s.done?T+'10':'transparent'}">
+            <span style="font-size:14px;font-weight:600;color:${T2}">${si+1}</span>
+            ${e.w?`<span style="font-size:15px">${s.weight!=null?s.weight+'kg':'—'}</span>`:''}
+            <span style="font-size:15px">${s.reps??'—'}</span>
+            <span style="font-size:13px;color:${T2}">${s.note||''}</span>
+          </div>`).join('')}
+        </div>`;
+      }).join('')}
+    </div>
+  </div>`;}
+
+function saveDetailName(key,val){if(!val.trim())return;makeMutable(key).name=val.trim();persist();}
+function saveDetailNotes(key,val){makeMutable(key).notes=val;persist();}
+
+function screenDetail(){
+  const sess=allS()[S.activeKey];if(!sess)return '';
+  return`<div>
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:${TOP} 16px 16px">
+      ${rb("S.screen='main';S.tab='routines';S.editMode=false;render()",ic('back',18))}
+      <button onclick="openSheet('addExDetail',{sessionKey:'${S.activeKey}',sets:3,rep:'8',rest:'1 min',w:true})"
+        style="background:none;border:none;color:${T};cursor:pointer;font-size:15px;font-weight:600">+ Exercise</button>
+    </div>
+    <div style="padding:0 16px 24px">
+      <div style="font-size:30px;font-weight:800;margin-bottom:22px">Session ${S.activeKey}: ${sess.name}</div>
+      <button onclick="initWk('${S.activeKey}');S.screen='workout';render()" style="width:100%;padding:16px;border-radius:14px;background:${C1};border:none;cursor:pointer;margin-bottom:24px">
+        <span style="color:${T};font-size:17px;font-weight:600">Start this Workout</span>
+      </button>
+      <div style="background:${C1};border-radius:16px;overflow:hidden;margin-bottom:24px">
+        <div style="padding:13px 16px;border-bottom:0.5px solid ${DIV}">
+          <div style="font-size:11px;font-weight:600;color:${T2};text-transform:uppercase;letter-spacing:0.5px;margin-bottom:5px">Session name</div>
+          <input type="text" value="${(sess.name||'').replace(/"/g,'&quot;')}"
+            onblur="saveDetailName('${S.activeKey}',this.value)"
+            style="width:100%;background:none;border:none;color:white;font-size:16px;outline:none;padding:0;"/>
         </div>
-        <i class="ti ti-chevron-right" style="color:${T2};font-size:18px"></i>
-      </div>`;
-    }).join('')}
-    <button onclick="S.screen='history';render()" style="width:100%;padding:14px;border-radius:14px;border:0.5px solid ${BORDER};background:transparent;color:white;font-size:15px;font-weight:500;cursor:pointer;margin-top:8px;margin-bottom:40px;display:flex;align-items:center;justify-content:center;gap:8px">
-      <i class="ti ti-history"></i> Workout history
+        <div style="padding:13px 16px;border-bottom:0.5px solid ${DIV};display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:16px">Weight and Reps</span>
+          <div style="display:flex;align-items:center;gap:6px"><span style="font-size:14px;color:${T2}">Latest</span>${ic('cr',14,T2)}</div>
+        </div>
+        <div style="padding:13px 16px">
+          <div style="font-size:11px;font-weight:600;color:${T2};text-transform:uppercase;letter-spacing:0.5px;margin-bottom:5px">Notes</div>
+          <textarea placeholder="Session notes, goals, context, reminders..."
+            onblur="saveDetailNotes('${S.activeKey}',this.value)"
+            oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"
+            style="width:100%;background:none;border:none;color:${T2};font-size:15px;outline:none;resize:none;padding:0;line-height:1.5;min-height:22px">${(sess.notes||'').replace(/</g,'&lt;')}</textarea>
+        </div>
+      </div>
+      <div style="background:${C1};border-radius:16px;overflow:hidden">
+        ${sess.exercises.length===0?`<div style="padding:20px;color:${T2};text-align:center">No exercises — tap "+ Exercise" to add</div>`:''}
+        ${sess.exercises.map((ex,i)=>`
+          <div style="padding:14px 16px;border-bottom:${i<sess.exercises.length-1?'0.5px solid '+DIV:'none'};display:flex;align-items:flex-start;justify-content:space-between">
+            <div style="flex:1;min-width:0;cursor:pointer" onclick="openSheet('editExDetail',{sessKey:'${S.activeKey}',exId:'${ex.id}',name:'${(ex.name||'').replace(/'/g,"\\'")}',sets:${ex.sets},rep:'${ex.rep}',rest:'${ex.rest}',note:'${(ex.note||'').replace(/'/g,"\\'")}',w:${ex.w}})">
+              <div style="font-size:16px;font-weight:700;margin-bottom:2px">${ex.name} ${ic('pencil',13,T2)}</div>
+              <div style="font-size:13px;color:${T2};line-height:1.7">${ex.sets} Sets · ${ex.rest}</div>
+              <div style="font-size:13px;color:${T2}">----</div>
+              <div style="font-size:13px;color:${T2}">Reps: ${ex.rep}</div>
+              ${ex.note?`<div style="font-size:13px;color:${T2}">Note: ${ex.note}</div>`:''}
+            </div>
+            <button onclick="removeDetailEx('${S.activeKey}','${ex.id}')" style="background:none;border:none;color:rgba(255,59,48,0.5);cursor:pointer;padding:4px;flex-shrink:0">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6M9 9l6 6"/></svg>
+            </button>
+          </div>`).join('')}
+      </div>
+    </div>
+  </div>`;}
+
+function screenWorkout(){
+  if(!S.wk)return '';
+  const ds=new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'});
+  const totalDone=Object.values(S.wk.setData).flat().filter(s=>s.done).length;
+  const total=Object.values(S.wk.setData).flat().length;
+  const [mEx,mSet]=[S.menuEx,S.menuSet];
+  return`<div>
+    <div style="padding:${TOP} 16px 14px;display:flex;align-items:center;gap:10px;border-bottom:0.5px solid ${DIV};background:#000;position:sticky;top:0;z-index:10">
+      ${rb('minimizeWk()',ic('down',20))}
+      <button onclick="finishWk()" style="padding:10px 22px;border-radius:22px;background:${T};border:none;color:#000;font-size:15px;font-weight:700;cursor:pointer;flex-shrink:0">Finish</button>
+      <span style="flex:1;text-align:center;font-size:15px;font-weight:600">${ds}</span>
+      <span style="font-size:12px;background:rgba(77,217,212,0.15);color:${T};padding:4px 10px;border-radius:20px;font-weight:600">${totalDone}/${total}</span>
+      ${rb('openTimer()',ic('clock',18,T2))}
+      ${rb("openSheet('wktNote',{note:S.wk.sessionNote||''})",ic('note',18,T2))}
+    </div>
+    ${S.wk.sessionNote?`<div style="margin:10px 16px 0;background:rgba(77,217,212,0.08);border-radius:10px;padding:10px 12px;font-size:13px;color:${T2};font-style:italic">${ic('note',13,T2)} ${S.wk.sessionNote}</div>`:''}
+    <div style="padding:14px 16px">
+      ${S.wk.exercises.map(ex=>buildEx(ex)).join('')}
+      <button onclick="openSheet('addExWkt',{sets:3,rep:'8',rest:'1 min',w:true})"
+        style="width:100%;padding:12px;border-radius:12px;border:0.5px dashed rgba(255,255,255,0.2);background:transparent;color:${T2};font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:8px">
+        ${ic('plus',16,T2)} Add exercise
+      </button>
+    </div>
+  </div>`;}
+
+function screenTimer(){
+  return`<div style="display:flex;flex-direction:column;min-height:100dvh;background:#000;padding:${TOP} 0 max(env(safe-area-inset-bottom),16px)">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:0 16px 10px">
+      <div style="width:38px"></div>
+      <div style="font-size:16px;font-weight:600;color:${T2}">Rest Timer</div>
+      ${rb('closeTimer()',ic('down',20))}
+    </div>
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:48px;padding:0 20px">
+      <div id="tc"></div>
+      <div style="display:flex;align-items:center;gap:36px">
+        <button onclick="timerAdj(-15)" style="width:64px;height:64px;border-radius:50%;background:${C2};border:none;color:${T};font-size:15px;font-weight:700;cursor:pointer">−15s</button>
+        <button id="tc-play" onclick="${S.timer.running?'timerPause()':'timerStart()'}"
+          style="width:76px;height:76px;border-radius:50%;background:${T};border:none;cursor:pointer;display:flex;align-items:center;justify-content:center">${ic(S.timer.running?'pause':'play',26,'#000')}</button>
+        <button onclick="timerAdj(15)" style="width:64px;height:64px;border-radius:50%;background:${C2};border:none;color:${T};font-size:15px;font-weight:700;cursor:pointer">+15s</button>
+      </div>
+    </div>
+    <div style="padding:0 20px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <span style="font-size:17px;font-weight:700">Timers</span>
+        ${ic('dots',20,T2)}
+      </div>
+      <div style="display:flex;gap:10px;overflow-x:auto;padding-bottom:6px">
+        <button style="width:52px;height:52px;border-radius:50%;background:${C2};border:none;color:${T};font-size:24px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center">+</button>
+        ${[30,45,60,90,120,180].map(s=>`<button id="tp-${s}" onclick="timerSet(${s})"
+          style="height:52px;min-width:64px;border-radius:26px;background:${S.timer.total===s?T:C2};color:${S.timer.total===s?'#000':T};border:none;cursor:pointer;font-size:14px;font-weight:700;padding:0 16px;flex-shrink:0">
+          ${s<60?'00:'+String(s).padStart(2,'0'):'0'+Math.floor(s/60)+':'+(s%60?String(s%60).padStart(2,'0'):'00')}
+        </button>`).join('')}
+      </div>
+    </div>
+  </div>`;}
+
+function weekBounds(){
+  const n=new Date(),d=n.getDay(),m=new Date(n);
+  m.setDate(n.getDate()-(d===0?6:d-1));m.setHours(0,0,0,0);
+  const s=new Date(m);s.setDate(m.getDate()+6);s.setHours(23,59,59,999);
+  return{mon:m,sun:s};
+}
+function screenStats(){
+  const total=S.history.length;
+  const{mon,sun}=weekBounds();
+  const wk=S.history.filter(h=>h.date>=mon&&h.date<=sun);
+  const mo=S.history.filter(h=>{const n=new Date();return h.date.getMonth()===n.getMonth()&&h.date.getFullYear()===n.getFullYear();});
+  const sc={};S.history.forEach(h=>{sc[h.sessionKey]=(sc[h.sessionKey]||0)+1;});
+  const top=Object.entries(sc).sort((a,b)=>b[1]-a[1])[0];
+  const prs={};
+  S.history.forEach(h=>{(h.exercises||[]).forEach(ex=>{(h.setData[ex.id]||[]).forEach(s=>{
+    if(s.weight&&s.reps){const sc=s.weight*s.reps;if(!prs[ex.name]||sc>prs[ex.name].score)prs[ex.name]={weight:s.weight,reps:s.reps,score:sc};}
+  });});});
+  const prList=Object.entries(prs).sort((a,b)=>b[1].score-a[1].score).slice(0,10);
+  return`<div style="padding:${TOP} 16px 20px">
+    <div style="font-size:34px;font-weight:800;margin-bottom:22px">Statistics</div>
+    <div style="font-size:12px;font-weight:600;color:${T2};text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px">This week · ${mon.toLocaleDateString('nl-BE',{day:'numeric',month:'short'})} – ${sun.toLocaleDateString('nl-BE',{day:'numeric',month:'short'})}</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:20px">
+      ${[{l:'Workouts',v:wk.length},{l:'Sets',v:wk.reduce((a,h)=>a+Object.values(h.setData||{}).flat().length,0)},{l:'Minutes',v:wk.reduce((a,h)=>a+h.duration,0)}].map(s=>`
+        <div style="background:${C1};border-radius:14px;padding:14px 10px;text-align:center">
+          <div style="font-size:26px;font-weight:700;color:${T}">${s.v}</div>
+          <div style="font-size:11px;color:${T2};margin-top:3px">${s.l}</div>
+        </div>`).join('')}
+    </div>
+    <div style="font-size:12px;font-weight:600;color:${T2};text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px">All time</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:20px">
+      ${[{l:'Total',v:total},{l:'This month',v:mo.length},{l:'Total sets',v:S.history.reduce((a,h)=>a+Object.values(h.setData||{}).flat().length,0)}].map(s=>`
+        <div style="background:${C1};border-radius:14px;padding:14px 10px;text-align:center">
+          <div style="font-size:26px;font-weight:700">${s.v}</div>
+          <div style="font-size:11px;color:${T2};margin-top:3px">${s.l}</div>
+        </div>`).join('')}
+    </div>
+    ${top?`<div style="background:${C1};border-radius:14px;padding:14px 16px;margin-bottom:20px">
+      <div style="font-size:12px;color:${T2};margin-bottom:4px">Most trained</div>
+      <div style="font-size:16px;font-weight:600">Session ${top[0]}: ${allS()[top[0]]?.name||'—'}</div>
+      <div style="font-size:13px;color:${T2};margin-top:2px">${top[1]} workout${top[1]!==1?'s':''}</div>
+    </div>`:''}
+    ${prList.length?`<div style="font-size:12px;font-weight:600;color:${T2};text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px">Personal Records</div>
+    <div style="background:${C1};border-radius:16px;overflow:hidden">
+      ${prList.map(([name,pr],i)=>`
+        <div style="padding:12px 16px;display:flex;justify-content:space-between;align-items:center;border-bottom:${i<prList.length-1?'0.5px solid '+DIV:'none'}">
+          <span style="font-size:15px">${name}</span>
+          <span style="font-size:14px;color:${T};font-weight:600">${pr.weight}kg × ${pr.reps}</span>
+        </div>`).join('')}
+    </div>`:`<div style="text-align:center;color:${T2};padding:40px 0">Log weighted exercises to see PRs</div>`}
+  </div>`;}
+
+function screenProfile(){
+  const tw=S.history.length;
+  const ts=S.history.reduce((a,h)=>a+Object.values(h.setData||{}).flat().length,0);
+  return`<div style="padding:${TOP} 16px 20px">
+    <div style="font-size:34px;font-weight:800;margin-bottom:24px">Profile</div>
+    <div style="background:${C1};border-radius:16px;padding:18px 16px;margin-bottom:16px;display:flex;align-items:center;gap:14px">
+      <div style="width:54px;height:54px;border-radius:50%;background:${T};display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:#000;flex-shrink:0">${displayName()[0]?.toUpperCase()||'?'}</div>
+      <div>
+        <div style="font-size:18px;font-weight:700">${displayName()}</div>
+        <div style="font-size:13px;color:${T2}">${tw} workout${tw!==1?'s':''} logged</div>
+      </div>
+    </div>
+    <div style="background:${C1};border-radius:16px;overflow:hidden;margin-bottom:16px">
+      <div style="padding:15px 16px;border-bottom:0.5px solid ${DIV};display:flex;justify-content:space-between">
+        <span>Total workouts</span><span style="color:${T2}">${tw}</span>
+      </div>
+      <div style="padding:15px 16px;border-bottom:0.5px solid ${DIV};display:flex;justify-content:space-between">
+        <span>Total sets</span><span style="color:${T2}">${ts}</span>
+      </div>
+      <div style="padding:15px 16px;display:flex;justify-content:space-between">
+        <span>Custom sessions</span><span style="color:${T2}">${Object.keys(S.customSessions).length}</span>
+      </div>
+    </div>
+    <div style="background:${C1};border-radius:16px;overflow:hidden;margin-bottom:16px">
+      <button onclick="openSheet('changeUser',{})" style="display:flex;width:100%;padding:15px 16px;background:none;border:none;border-bottom:0.5px solid ${DIV};cursor:pointer;align-items:center;gap:12px">
+        ${ic('pencil',20,T)}<span style="font-size:16px;color:white;flex:1;text-align:left">Change Display Name</span>${ic('cr',14,T2)}
+      </button>
+      <button onclick="openSheet('changePwd',{})" style="display:flex;width:100%;padding:15px 16px;background:none;border:none;cursor:pointer;align-items:center;gap:12px">
+        ${ic('key',20,T)}<span style="font-size:16px;color:white;flex:1;text-align:left">Change Password</span>${ic('cr',14,T2)}
+      </button>
+    </div>
+    <button onclick="showConfirm('Sign out?',()=>{if(S.timer.iv)clearInterval(S.timer.iv);S.timer.iv=null;const u=S.user;Object.assign(S,{user:null,screen:\'login\',loginU:u,loginP:\'\',loginErr:false,wk:null,wkMinimized:false,history:[],prevSet:{},customSessions:{},editMode:false,menuEx:null,menuSet:null,timerStrip:false,timer:{total:120,remain:120,running:false,iv:null}});render();},'Sign out',true)"
+      style="width:100%;padding:15px;border-radius:14px;background:rgba(255,59,48,0.12);border:0.5px solid rgba(255,59,48,0.3);color:#FF3B30;font-size:16px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px">
+      ${ic('logout',18,'#FF3B30')} Sign out
     </button>
   </div>`;}
 
-function renderWorkout(){
-  const s=sess()[S.sessionKey];const c=col();
-  return`<div>
-    <div style="padding:max(env(safe-area-inset-top),14px) 16px 14px;display:flex;align-items:center;gap:12px;border-bottom:0.5px solid ${BORDER};background:${BG};position:sticky;top:0;z-index:5">
-      <button onclick="if(confirm('End workout without saving?')){S.screen='home';S.sessionKey=null;if(S.timerInterval){clearInterval(S.timerInterval);S.timerInterval=null;}render();}" style="background:none;border:none;color:${T2};cursor:pointer;padding:4px;display:flex">
-        <i class="ti ti-x" style="font-size:22px"></i>
-      </button>
-      <div style="flex:1">
-        <div style="font-size:12px;color:${T2}">Session ${S.sessionKey}</div>
-        <div style="font-size:17px;font-weight:600">${s.name}</div>
-      </div>
-      <div style="font-size:12px;background:${c}22;color:${c};padding:5px 12px;border-radius:20px;font-weight:600">${doneSets()}/${totalSets()}</div>
-      <button onclick="S.editMode=!S.editMode;render()" style="background:${S.editMode?c+'22':'rgba(255,255,255,0.07)'};border:none;color:${S.editMode?c:T2};padding:7px 12px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:500">${S.editMode?'Done':'Edit'}</button>
-    </div>
-    <div style="padding:12px 16px">
-      ${S.exercises.map(ex=>{
-        const sets=S.setData[ex.id]||[];
-        return`<div style="background:${CARD};border-radius:18px;margin-bottom:14px;overflow:hidden;border:0.5px solid ${BORDER}">
-          <div style="padding:13px 14px 10px;display:flex;align-items:center;gap:10px">
-            ${S.editMode?`<button onclick="removeExercise('${ex.id}')" style="width:24px;height:24px;border-radius:50%;background:#FF3B30;border:none;color:white;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="ti ti-minus" style="font-size:13px"></i></button>`:''}
-            <div style="flex:1;min-width:0">
-              <span style="font-weight:600;font-size:16px">${ex.name}</span>
-              ${ex.note?`<span style="font-size:12px;color:${T2};display:block;margin-top:1px">${ex.note}</span>`:''}
-            </div>
-            <span style="font-size:13px;color:${T2};flex-shrink:0">${ex.target}</span>
-          </div>
-          <div style="border-top:0.5px solid ${BORDER}">
-            <div style="display:grid;grid-template-columns:22px 56px 1fr 1fr 30px 30px;gap:0;padding:6px 14px;border-bottom:0.5px solid ${BORDER}">
-              <span style="font-size:10px;color:${T2};font-weight:600">Set</span>
-              <span style="font-size:10px;color:${T2};font-weight:600">Prev</span>
-              <span style="font-size:10px;color:${T2};font-weight:600;text-align:center">kg</span>
-              <span style="font-size:10px;color:${T2};font-weight:600;text-align:center">Reps</span>
-              <span></span><span></span>
-            </div>
-            ${sets.map((st,si)=>{
-              const nk=`${ex.id}-${si}`;const noteOpen=S.noteOpen[nk];
-              const prev=st.prevWeight?`${st.prevWeight}×${st.prevReps}`:'—';
-              return`<div style="background:${st.done?c+'15':'transparent'};transition:background 0.2s">
-                <div style="display:grid;grid-template-columns:22px 56px 1fr 1fr 30px 30px;gap:0;padding:9px 14px;align-items:center">
-                  <span style="font-size:14px;font-weight:600;color:${T2}">${si+1}</span>
-                  <span style="font-size:11px;color:${T2}">${prev}</span>
-                  <input data-w="${ex.id},${si}" type="number" value="${st.weight??''}" placeholder="${st.prevWeight??'—'}" step="0.5" inputmode="decimal"
-                    style="background:${CARD2};border:none;border-radius:9px;padding:7px 6px;color:white;font-size:16px;font-weight:600;width:100%;text-align:center;margin:0 3px;outline:none;"/>
-                  <input data-r="${ex.id},${si}" type="number" value="${st.reps??''}" placeholder="${st.prevReps??'—'}" inputmode="numeric"
-                    style="background:${CARD2};border:none;border-radius:9px;padding:7px 6px;color:white;font-size:16px;font-weight:600;width:100%;text-align:center;margin:0 3px;outline:none;"/>
-                  <button onclick="toggleNote('${nk}')" style="background:none;border:none;color:${noteOpen||st.note?c:T2};cursor:pointer;padding:4px;font-size:17px;display:flex;align-items:center;justify-content:center"><i class="ti ti-notes"></i></button>
-                  <button onclick="toggleDone('${ex.id}',${si})" style="background:${st.done?c:'rgba(255,255,255,0.08)'};border:none;border-radius:9px;width:28px;height:28px;cursor:pointer;color:white;display:flex;align-items:center;justify-content:center;font-size:14px">${st.done?'<i class="ti ti-check"></i>':'<i class="ti ti-circle"></i>'}</button>
-                </div>
-                ${noteOpen||st.note?`<div style="padding:0 14px 10px;display:flex;gap:8px;align-items:flex-start">
-                  <textarea data-n="${ex.id},${si}" placeholder="Add a note..." rows="2" style="flex:1;background:${CARD2};border:none;border-radius:10px;padding:9px 12px;color:white;font-size:14px;resize:none;outline:none;line-height:1.4;">${st.note}</textarea>
-                  <button onclick="removeSet('${ex.id}',${si})" style="background:rgba(255,59,48,0.15);border:none;border-radius:9px;color:#FF3B30;width:34px;height:34px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="ti ti-trash" style="font-size:15px"></i></button>
-                </div>`:''}
-              </div>`;
-            }).join('')}
-            <div style="padding:8px 14px 12px">
-              <button onclick="addSet('${ex.id}')" style="width:100%;padding:9px;border-radius:10px;border:0.5px dashed rgba(255,255,255,0.18);background:transparent;color:${T2};font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px"><i class="ti ti-plus" style="font-size:14px"></i> Add set</button>
-            </div>
-          </div>
-        </div>`;
-      }).join('')}
-      ${S.editMode?`<div style="background:${CARD};border-radius:18px;padding:14px;margin-bottom:14px;border:0.5px solid ${BORDER}">
-        ${S.showAddEx?`<div>
-          <input id="axn" type="text" placeholder="Exercise name" value="${S.addExName}" oninput="S.addExName=this.value" style="width:100%;background:${CARD2};border:none;border-radius:12px;padding:12px;color:white;font-size:15px;margin-bottom:8px;outline:none;"/>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
-            <input type="text" placeholder="Target (3×10)" value="${S.addExTarget}" oninput="S.addExTarget=this.value" style="background:${CARD2};border:none;border-radius:12px;padding:12px;color:white;font-size:14px;outline:none;"/>
-            <input type="text" placeholder="Note" value="${S.addExNote}" oninput="S.addExNote=this.value" style="background:${CARD2};border:none;border-radius:12px;padding:12px;color:white;font-size:14px;outline:none;"/>
-          </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-            <button onclick="S.showAddEx=false;render()" style="padding:12px;border-radius:12px;border:0.5px solid ${BORDER};background:transparent;color:${T2};cursor:pointer;font-size:14px">Cancel</button>
-            <button onclick="addExercise()" style="padding:12px;border-radius:12px;border:none;background:${c};color:white;font-weight:600;cursor:pointer;font-size:14px">Add</button>
-          </div>
-        </div>`:`<button onclick="S.showAddEx=true;render()" style="width:100%;padding:12px;border-radius:12px;border:0.5px dashed rgba(255,255,255,0.18);background:transparent;color:${T2};cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;font-size:14px"><i class="ti ti-plus"></i> Add exercise</button>`}
-      </div>`:''}
-      <button onclick="finishSession()" style="width:100%;padding:16px;border-radius:16px;background:${c};color:white;border:none;font-size:17px;font-weight:600;cursor:pointer;margin-bottom:max(env(safe-area-inset-bottom,16px),16px)">Finish session</button>
-    </div>
-  </div>`;}
-
-function renderComplete(){
-  const dur=S.history[0]?.duration||0;const c=col();const s=sess()[S.sessionKey];
-  const exDone=S.exercises.filter(e=>(S.setData[e.id]||[]).some(x=>x.done)).length;
-  return`<div style="padding:40px 20px;text-align:center">
-    <div style="width:88px;height:88px;border-radius:50%;background:${c}20;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;box-shadow:0 0 40px ${c}30">
-      <i class="ti ti-trophy" style="font-size:40px;color:${c}"></i>
-    </div>
-    <h2 style="font-size:26px;font-weight:700;margin-bottom:8px">Session done!</h2>
-    <p style="color:${T2};font-size:15px;margin-bottom:32px">${s?.name} · ${new Date().toLocaleDateString('nl-BE',{day:'numeric',month:'long'})}</p>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:28px">
-      ${[{l:'Duration',v:dur+'m'},{l:'Exercises',v:exDone+'/'+S.exercises.length},{l:'Total sets',v:totalSets()}].map(st=>`
-        <div style="background:${CARD};border-radius:14px;padding:16px 8px">
-          <div style="font-size:24px;font-weight:700">${st.v}</div>
-          <div style="font-size:11px;color:${T2};margin-top:3px">${st.l}</div>
-        </div>`).join('')}
-    </div>
-    <div style="background:${CARD};border-radius:16px;padding:16px;margin-bottom:24px;text-align:left">
-      <div style="font-size:11px;font-weight:600;color:${T2};text-transform:uppercase;letter-spacing:0.7px;margin-bottom:12px">Exercise log</div>
-      ${S.exercises.filter(e=>(S.setData[e.id]||[]).length>0).map(e=>`
-        <div style="margin-bottom:8px;padding-bottom:8px;border-bottom:0.5px solid ${BORDER}">
-          <div style="font-size:13px;font-weight:600;margin-bottom:4px">${e.name}</div>
-          <div style="font-size:12px;color:${T2}">${(S.setData[e.id]||[]).map((s,i)=>`<span style="margin-right:8px">Set ${i+1}: ${s.weight??'—'}kg×${s.reps}</span>`).join('')}</div>
-        </div>`).join('')}
-    </div>
-    <button onclick="S.screen='home';render()" style="width:100%;padding:16px;border-radius:16px;background:${c};color:white;border:none;font-size:17px;font-weight:600;cursor:pointer">Back to sessions</button>
-  </div>`;}
-
-function renderHistory(){
-  return`<div style="padding:max(env(safe-area-inset-top),20px) 16px 0">
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px">
-      <button onclick="S.screen='home';render()" style="background:none;border:none;color:${T2};cursor:pointer;padding:4px;display:flex"><i class="ti ti-arrow-left" style="font-size:24px"></i></button>
-      <h1 style="font-size:26px;font-weight:700">History</h1>
-    </div>
-    ${S.history.length===0?`<div style="text-align:center;padding:80px 0;color:${T2}"><i class="ti ti-clipboard" style="font-size:48px;display:block;margin-bottom:16px;opacity:0.3"></i>No workouts yet</div>`:
-    S.history.map(h=>{
-      const c=COLORS[h.sessionKey]||'#5E5CE6';
-      const total=Object.values(h.setData||{}).flat().length;
-      return`<div style="background:${CARD};border-radius:16px;padding:14px;margin-bottom:12px;border:0.5px solid ${BORDER}">
-        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
-          <div style="width:42px;height:42px;border-radius:12px;background:${c}20;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:${c};flex-shrink:0">${h.sessionKey}</div>
-          <div style="flex:1">
-            <div style="font-weight:600;font-size:15px">${h.sessionName||'Workout'}</div>
-            <div style="font-size:12px;color:${T2}">${h.date} · ${h.time} · ${h.duration}min · ${total} sets</div>
-          </div>
-        </div>
-        ${(h.exercises||[]).filter(e=>(h.setData||{})[e.id]?.length>0).slice(0,5).map(e=>`
-          <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:0.5px solid ${BORDER}">
-            <span style="font-size:13px;color:${T2}">${e.name}</span>
-            <span style="font-size:12px;color:white">${(h.setData[e.id]||[]).map(s=>`${s.weight??'—'}×${s.reps}`).join(' · ')}</span>
-          </div>`).join('')}
-        ${(h.exercises||[]).filter(e=>(h.setData||{})[e.id]?.length>0).length>5?`<div style="font-size:12px;color:${T2};padding-top:8px">+${(h.exercises||[]).filter(e=>(h.setData||{})[e.id]?.length>0).length-5} more</div>`:''}
-      </div>`;
-    }).join('')}
-    <div style="height:40px"></div>
-  </div>`;}
-
-// Register service worker
-if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('sw.js').catch(()=>{});
-}
-
-// Init
-fetchHistory().catch(()=>loadHistory()).finally(()=>{S.screen='login';render();});
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+render();
 </script>
 </body>
 </html>
