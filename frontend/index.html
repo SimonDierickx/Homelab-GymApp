@@ -14,7 +14,9 @@
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
 html,body{background:#000;color:#fff;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display',sans-serif;height:100%;overscroll-behavior:none;}
 body{display:flex;flex-direction:column;max-width:430px;margin:0 auto;min-height:100dvh;}
+#bottom-ui{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:430px;z-index:50;}
 #scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+#bottom-ui{background:#1C1C1E;}
 input,textarea,select,button{font-family:inherit;-webkit-appearance:none;appearance:none;}
 input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
 input[type=number]{-moz-appearance:textfield;}
@@ -30,6 +32,7 @@ input[type=number]{-moz-appearance:textfield;}
 <div id="bottom-ui"></div><!-- timer strip + resume strip + tab bar -->
 <div id="sheet-root"></div>
 <div id="dlg-root"></div>
+<div style="position:fixed;bottom:0;left:0;right:0;max-width:430px;margin:0 auto;height:env(safe-area-inset-bottom);background:#1C1C1E;z-index:4;pointer-events:none"></div>
 <script src="config.js"></script>
 <script>
 if(typeof USERS==='undefined')window.USERS={simon:'coach2024'};
@@ -641,13 +644,16 @@ function renderBottomUI(){
   // Tab bar (main screens and minimized workout)
   if(S.screen==='main'||(S.wk&&S.wkMinimized)){
     const tabs=[{id:'log',label:'Log',icon:'log'},{id:'routines',label:'Routines',icon:'list'},{id:'stats',label:'Statistics',icon:'chart'},{id:'profile',label:'Profile',icon:'user'}];
-    strips+=`<div style="background:${C1};border-top:0.5px solid ${DIV};display:flex;padding:4px 0 ${BOT}">
-      ${tabs.map(tab=>`<button onclick="S.tab='${tab.id}';S.editMode=false;render()" style="flex:1;background:none;border:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;padding:4px 0">
-        <div style="width:56px;height:36px;border-radius:18px;background:${S.tab===tab.id?C2:'transparent'};display:flex;align-items:center;justify-content:center">
-          ${ic(tab.icon,23,S.tab===tab.id?T:'rgba(255,255,255,0.4)')}
-        </div>
-        <span style="font-size:10px;font-weight:500;color:${S.tab===tab.id?T:'rgba(255,255,255,0.4)'}">${tab.label}</span>
-      </button>`).join('')}
+    strips+=`<div style="background:${C1};border-top:0.5px solid ${DIV}">
+      <div style="display:flex;padding:4px 0 0">
+        ${tabs.map(tab=>`<button onclick="S.tab='${tab.id}';S.editMode=false;render()" style="flex:1;background:none;border:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;padding:4px 0 6px">
+          <div style="width:56px;height:36px;border-radius:18px;background:${S.tab===tab.id?C2:'transparent'};display:flex;align-items:center;justify-content:center">
+            ${ic(tab.icon,23,S.tab===tab.id?T:'rgba(255,255,255,0.4)')}
+          </div>
+          <span style="font-size:10px;font-weight:500;color:${S.tab===tab.id?T:'rgba(255,255,255,0.4)'}">${tab.label}</span>
+        </button>`).join('')}
+      </div>
+      <div style="height:env(safe-area-inset-bottom)"></div>
     </div>`;
   }
   el.innerHTML=strips;
@@ -662,12 +668,16 @@ function render(){
   }
   document.getElementById('scroll').className='anim';
   document.getElementById('scroll').innerHTML=renderScreen();
-  // Padding for bottom UI
-  let pb=0;
-  if(S.wk&&S.wkMinimized)pb+=80; // resume strip
-  if(S.screen==='workout'&&S.timerStrip)pb+=76; // timer strip
-  if(S.screen==='main'||(S.wk&&S.wkMinimized))pb+=66; // tab bar
-  document.getElementById('scroll').style.paddingBottom=pb+'px';
+  // Padding accounts for fixed bottom-ui + iOS safe area
+  let pb='0px';
+  if(S.screen==='main'){
+    pb='calc(66px + env(safe-area-inset-bottom))';
+  } else if(S.wk&&S.wkMinimized){
+    pb='calc(148px + env(safe-area-inset-bottom))'; // resume strip + tab bar
+  } else if(S.screen==='workout'&&S.timerStrip){
+    pb='calc(76px + env(safe-area-inset-bottom))';
+  }
+  document.getElementById('scroll').style.paddingBottom=pb;
   renderBottomUI();wireAll();
 }
 function renderScreen(){
